@@ -1,6 +1,6 @@
 # Yellow
 
-A terminal manipulation library for Rust with ncurses-inspired API and C/FFI bindings for other languages.
+A terminal manipulation library for Rust and C/FFI bindings for other languages.
 
 <img src="examples/resources/demo.png" alt="Yellow's mosaic demo" width="412">
 
@@ -19,6 +19,36 @@ Yellow's mosaic demo with Zig wrapper
 - Graphics support (Kitty image protocol, Sixel)
 - Unicode block mosaic rendering from images
 - Scrolling regions
+
+## C FFI API
+
+The library exports a C-compatible API for use with other languages:
+
+### Screen Management
+- `yellow_init()` - Initialize screen
+- `yellow_endwin()` - Clean up and restore terminal
+- `yellow_clear()` - Clear screen
+- `yellow_refresh()` - Refresh display
+
+### Output
+- `yellow_print()` - Print at cursor position
+- `yellow_mvprint()` - Print at specific position
+- `yellow_move_cursor()` - Move cursor
+
+### Colors and Attributes
+- `yellow_set_fg_color()` - Set foreground RGB color
+- `yellow_set_bg_color()` - Set background RGB color
+- `yellow_attron()` - Enable text attributes
+- `yellow_attroff()` - Disable text attributes
+
+### Input
+- `yellow_getch()` - Get key input
+
+### Utilities
+- `yellow_get_size()` - Get terminal dimensions
+- `yellow_render_mosaic()` - Render image as Unicode art
+- `yellow_free_string()` - Free mosaic string
+
 
 ## Installation
 
@@ -203,35 +233,6 @@ char* mosaic = yellow_render_mosaic(data, data_len, width, height, 60, 100);
 printf("%s\n", mosaic);
 yellow_free_string(mosaic);
 ```
-
-## C FFI API
-
-The library exports a C-compatible API for use with other languages:
-
-### Screen Management
-- `yellow_init()` - Initialize screen
-- `yellow_endwin()` - Clean up and restore terminal
-- `yellow_clear()` - Clear screen
-- `yellow_refresh()` - Refresh display
-
-### Output
-- `yellow_print()` - Print at cursor position
-- `yellow_mvprint()` - Print at specific position
-- `yellow_move_cursor()` - Move cursor
-
-### Colors and Attributes
-- `yellow_set_fg_color()` - Set foreground RGB color
-- `yellow_set_bg_color()` - Set background RGB color
-- `yellow_attron()` - Enable text attributes
-- `yellow_attroff()` - Disable text attributes
-
-### Input
-- `yellow_getch()` - Get key input
-
-### Utilities
-- `yellow_get_size()` - Get terminal dimensions
-- `yellow_render_mosaic()` - Render image as Unicode art
-- `yellow_free_string()` - Free mosaic string
 
 ## License
 
