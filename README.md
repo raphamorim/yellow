@@ -2,11 +2,11 @@
 
 A terminal manipulation library for Rust with ncurses-inspired API and C/FFI bindings for other languages.
 
-<img src="examples/resources/yellow.png" alt="Yellow's mosaic demo" width="128">
+<img src="examples/resources/yellow.png" alt="Yellow's mosaic demo" width="512">
 
 Yellow's mosaic demo with Zig wrapper
 
-<img src="examples/resources/demo-bindings-zig.png" alt="Yellow's mosaic demo with Zig wrapper" width="128">
+<img src="examples/resources/demo-bindings-zig.png" alt="Yellow's mosaic demo with Zig wrapper" width="512">
 
 ## Features
 
