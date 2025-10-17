@@ -3,6 +3,9 @@ name = "yellow"
 version = "0.0.2"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 bitflags = "2.6"
 

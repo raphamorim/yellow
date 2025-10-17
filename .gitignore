@@ -1,1 +1,30 @@
+# Rust
 /target
+Cargo.lock
+*.rs.bk
+debug/
+release/
+
+# Zig
+zig-out/
+zig-cache/
+.zig-cache/
+*.o
+*.dSYM/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.dylib
+*.so
+*.a
+*.lib
+*.dll

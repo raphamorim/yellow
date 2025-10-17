@@ -2,7 +2,7 @@ use std::ops::{BitAnd, BitOr, Not};
 
 /// Text attributes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Attr(u16);
+pub struct Attr(pub(crate) u16);
 
 impl Attr {
     pub const NORMAL: Attr = Attr(0);
