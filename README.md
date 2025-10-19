@@ -131,36 +131,6 @@ pub fn main() !void {
 }
 ```
 
-## Running Examples
-
-### Rust Examples
-
-```bash
-# Basic demo
-cargo run --example demo
-
-# Mosaic rendering from image
-cargo run --example mosaic
-```
-
-### Zig Examples
-
-```bash
-# Basic example
-make run-zig
-
-# Or run directly:
-DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/basic
-
-# Mosaic example (loads and displays yellow.png as Unicode art)
-make run-zig-mosaic
-
-# Or run directly:
-DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic
-```
-
-On Linux, use `LD_LIBRARY_PATH` instead of `DYLD_LIBRARY_PATH`.
-
 ## C FFI API
 
 The library exports a C-compatible API for use with other languages:

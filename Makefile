@@ -47,6 +47,9 @@ run-zig-example-colors: zig-build-examples
 		LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/colors-rgb; \
 	fi
 
+run-rust-example-colors:
+	@cd examples/apps/colors-rgb && cargo run --release
+
 # Run Rust tests
 test:
 	@echo "Running Rust tests..."
