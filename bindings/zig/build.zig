@@ -11,10 +11,15 @@ pub fn build(b: *std.Build) void {
     });
     zaz_mod.addIncludePath(b.path("."));
 
-    // Basic example
+    // Basic example module
+    const basic_mod = b.createModule(.{
+        .root_source_file = b.path("examples/basic.zig"),
+    });
+    basic_mod.addImport("zaz", zaz_mod);
+
     const basic_exe = b.addExecutable(.{
         .name = "basic",
-        .root_source_file = b.path("examples/basic.zig"),
+        .root_module = basic_mod,
         .target = target,
         .optimize = optimize,
     });
