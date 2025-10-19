@@ -144,12 +144,10 @@ mod tests {
 
     #[test]
     fn test_packed_color_size() {
-        // Due to alignment, size might be 4 bytes on some platforms
-        // The important part is that it's small and transparent
+        // PackedColor is repr(transparent) wrapping u16, so it should be exactly 2 bytes
         let size = std::mem::size_of::<PackedColor>();
-        assert!(size <= 4, "PackedColor should be at most 4 bytes, got {}", size);
-        println!("PackedColor size: {} bytes", size);
-        println!("u16 size: {} bytes", std::mem::size_of::<u16>());
+        assert_eq!(size, 2, "PackedColor should be exactly 2 bytes (u16)");
+        assert_eq!(size, std::mem::size_of::<u16>(), "PackedColor size should match u16");
     }
 
     #[test]

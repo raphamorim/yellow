@@ -11,10 +11,33 @@ use std::os::unix::io::RawFd;
 #[cfg(unix)]
 const STDOUT_FD: RawFd = 1;
 
+/// Get the file descriptor to write to (stdout in production, /dev/null in tests)
+#[cfg(all(unix, test))]
+fn get_output_fd() -> RawFd {
+    use std::sync::OnceLock;
+    static DEVNULL: OnceLock<RawFd> = OnceLock::new();
+
+    *DEVNULL.get_or_init(|| {
+        use std::ffi::CString;
+        let path = CString::new("/dev/null").unwrap();
+        unsafe {
+            libc::open(path.as_ptr(), libc::O_WRONLY)
+        }
+    })
+}
+
+#[cfg(all(unix, not(test)))]
+#[inline]
+fn get_output_fd() -> RawFd {
+    STDOUT_FD
+}
+
 /// Write bytes directly to stdout using unbuffered syscall
 ///
 /// On Unix: Uses libc::write() directly for single-syscall output
 /// On Windows: Falls back to std::io for compatibility
+///
+/// In test mode: Writes to /dev/null to avoid spamming test output
 ///
 /// This provides ~5-15% performance improvement over buffered I/O
 /// by eliminating redundant buffering and reducing syscall overhead.
@@ -26,12 +49,13 @@ pub fn write_stdout(buf: &[u8]) -> io::Result<usize> {
 
     let mut total_written = 0;
     let mut remaining = buf;
+    let fd = get_output_fd();
 
     // Handle partial writes and interruptions
     while !remaining.is_empty() {
         let written = unsafe {
             libc::write(
-                STDOUT_FD,
+                fd,
                 remaining.as_ptr() as *const libc::c_void,
                 remaining.len(),
             )

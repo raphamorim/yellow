@@ -11,14 +11,14 @@ Zaz's mosaic demo with Zig wrapper
 ## Features
 
 - Effiecient terminal rendering (Smart Style Caching, Paul Heckel's Diff Algorithm, Cost-based Cursor Movement, etc...)
-- SIMD-Accelerated Line Comparison
+- SIMD for large screens (work in progress)
 - Terminal initialization and screen management
 - Cursor positioning and text output
 - RGB color support with ANSI escape codes
 - Text attributes (bold, italic, underline, etc.)
 - Window and panel management
 - Keyboard input handling with Kitty keyboard protocol
-- Graphics support (Kitty image protocol, Sixel)
+- Graphics support (Kitty image protocol, Sixel, iTerm2)
 - Unicode block mosaic rendering from images
 - Scrolling regions
 

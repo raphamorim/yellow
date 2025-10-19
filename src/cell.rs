@@ -109,13 +109,10 @@ mod tests {
     #[test]
     fn test_cell_size() {
         let size = std::mem::size_of::<Cell>();
-        println!("Cell size: {} bytes", size);
-        println!("char: {} bytes", std::mem::size_of::<char>());
-        println!("Attr: {} bytes", std::mem::size_of::<Attr>());
-        println!("PackedColor: {} bytes", std::mem::size_of::<PackedColor>());
 
-        // Target is 12 bytes (due to alignment), must be better than 32 bytes
-        assert!(size <= 16, "Cell should be at most 16 bytes, got {}", size);
+        // Phase 1.1 optimization: Cell should be 12 bytes (char=4, Attr=2, fg=2, bg=2)
+        // With alignment, we accept up to 16 bytes
+        assert_eq!(size, 12, "Cell should be exactly 12 bytes for optimal cache usage");
         assert!(size < 20, "Cell should be significantly smaller than original ~32 bytes");
     }
 
@@ -285,11 +282,10 @@ mod tests {
         let expected = cell_size * 80;
 
         assert_eq!(size, expected);
-        println!("80 cells use {} bytes ({} bytes per cell)", size, cell_size);
 
         // Verify it's significantly smaller than original
         // Original was ~32 bytes, so 80 cells = 2560 bytes
-        // New should be ~12 bytes, so 80 cells = 960 bytes
-        assert!(size < 1400, "80 cells should use less than 1400 bytes, got {}", size);
+        // New should be 12 bytes, so 80 cells = 960 bytes
+        assert_eq!(size, 960, "80 cells should use exactly 960 bytes (12 bytes per cell)");
     }
 }
