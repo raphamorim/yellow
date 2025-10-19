@@ -1,6 +1,7 @@
 use crate::attr::Attr;
 use crate::color::Color;
 use crate::error::{Error, Result};
+use smallvec::SmallVec;
 use std::fmt::Write;
 use std::io;
 
@@ -21,8 +22,8 @@ pub struct Window {
     last_emitted_attr: Attr,
     last_emitted_fg: Option<Color>,
     last_emitted_bg: Option<Color>,
-    // Performance optimization: reuse style code buffer to avoid allocations
-    style_code_buffer: Vec<String>,
+    // Performance optimization: SmallVec for style sequence (stack-allocated for <64 bytes)
+    style_sequence_buf: SmallVec<[u8; 64]>,
 }
 
 impl Window {
@@ -46,7 +47,7 @@ impl Window {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::with_capacity(5), // Pre-allocate for typical usage
+            style_sequence_buf: SmallVec::new(), // Stack-allocated for sequences <64 bytes
         })
     }
 
@@ -306,44 +307,61 @@ impl Window {
             return Ok(());
         }
 
-        // Performance optimization: reuse allocated buffer
-        self.style_code_buffer.clear();
+        // Performance optimization: use SmallVec (stack-allocated)
+        self.style_sequence_buf.clear();
+        let mut needs_separator = false;
 
         // If any attribute changed, we need to reset and re-apply all
         // (ANSI doesn't support selective attribute removal)
         if self.current_attr != self.last_emitted_attr {
             // Reset all attributes first
             if self.last_emitted_attr != Attr::NORMAL {
-                self.style_code_buffer.push("0".to_string());
+                self.style_sequence_buf.push(b'0');
+                needs_separator = true;
             }
 
             // Add current attribute codes
             if !self.current_attr.is_empty() {
-                self.style_code_buffer.extend(
-                    self.current_attr
-                        .to_ansi_codes()
-                        .iter()
-                        .map(|s| s.to_string()),
-                );
+                for code in self.current_attr.to_ansi_codes() {
+                    if needs_separator {
+                        self.style_sequence_buf.push(b';');
+                    }
+                    self.style_sequence_buf.extend_from_slice(code.as_bytes());
+                    needs_separator = true;
+                }
             }
         }
 
-        // Add color codes if changed
+        // Add color codes if changed (using temporary buffer for String conversion)
+        let mut color_buf = String::with_capacity(20);
         if self.current_fg != self.last_emitted_fg {
             if let Some(fg) = &self.current_fg {
-                self.style_code_buffer.push(fg.to_ansi_fg());
+                if needs_separator {
+                    self.style_sequence_buf.push(b';');
+                }
+                color_buf.clear();
+                fg.write_ansi_fg(&mut color_buf);
+                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+                needs_separator = true;
             }
         }
         if self.current_bg != self.last_emitted_bg {
             if let Some(bg) = &self.current_bg {
-                self.style_code_buffer.push(bg.to_ansi_bg());
+                if needs_separator {
+                    self.style_sequence_buf.push(b';');
+                }
+                color_buf.clear();
+                bg.write_ansi_bg(&mut color_buf);
+                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
             }
         }
 
-        if !self.style_code_buffer.is_empty() {
-            write!(self.buffer, "\x1b[{}m", self.style_code_buffer.join(";")).map_err(|_| {
-                Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
-            })?;
+        if !self.style_sequence_buf.is_empty() {
+            self.buffer.push_str("\x1b[");
+            self.buffer.push_str(
+                std::str::from_utf8(&self.style_sequence_buf).unwrap()
+            );
+            self.buffer.push('m');
         }
 
         // Update last emitted state

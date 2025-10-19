@@ -24,6 +24,33 @@ pub enum Color {
 }
 
 impl Color {
+    /// Convert color to (discriminant, data) for efficient hashing
+    /// Returns (type_byte, data_u32) to minimize branches in hash functions
+    #[inline(always)]
+    pub(crate) fn hash_bytes(&self) -> (u8, u32) {
+        match self {
+            Color::Black => (1, 0),
+            Color::Red => (2, 0),
+            Color::Green => (3, 0),
+            Color::Yellow => (4, 0),
+            Color::Blue => (5, 0),
+            Color::Magenta => (6, 0),
+            Color::Cyan => (7, 0),
+            Color::White => (8, 0),
+            Color::BrightBlack => (9, 0),
+            Color::BrightRed => (10, 0),
+            Color::BrightGreen => (11, 0),
+            Color::BrightYellow => (12, 0),
+            Color::BrightBlue => (13, 0),
+            Color::BrightMagenta => (14, 0),
+            Color::BrightCyan => (15, 0),
+            Color::BrightWhite => (16, 0),
+            Color::Ansi256(c) => (17, *c as u32),
+            Color::Rgb(r, g, b) => (18, ((*r as u32) << 16) | ((*g as u32) << 8) | (*b as u32)),
+            Color::Reset => (19, 0),
+        }
+    }
+
     /// Write foreground ANSI code directly to a string buffer (zero-allocation for basic colors)
     pub(crate) fn write_ansi_fg(&self, buf: &mut String) {
         use std::fmt::Write;

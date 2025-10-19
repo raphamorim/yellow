@@ -1454,6 +1454,7 @@ dependencies = [
  "criterion",
  "image",
  "libc",
+ "smallvec",
 ]
 
 [[package]]
