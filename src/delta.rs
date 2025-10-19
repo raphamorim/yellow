@@ -9,6 +9,17 @@ pub struct DirtyRegion {
     pub last_changed: Option<u16>,
 }
 
+/// Represents a scroll operation (like ncurses' scroll hunks)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScrollOp {
+    /// Starting line of the scroll region
+    pub start: usize,
+    /// Number of lines in the scroll region
+    pub size: usize,
+    /// Number of lines to shift (positive = scroll up, negative = scroll down)
+    pub shift: isize,
+}
+
 impl DirtyRegion {
     /// Create a clean (no changes) dirty region
     pub fn clean() -> Self {
@@ -131,6 +142,129 @@ pub fn hash_line(cells: &[Cell]) -> u64 {
             .wrapping_add(cell.bg.map(|c| hash_color(&c)).unwrap_or(0));
     }
     hash
+}
+
+/// Detect scroll operations using hash-based line matching (Modified Heckel's Algorithm)
+/// Inspired by ncurses hashmap.c
+pub fn detect_scrolls(
+    old_hashes: &[u64],
+    new_hashes: &[u64],
+) -> Vec<ScrollOp> {
+    let old_len = old_hashes.len();
+    let new_len = new_hashes.len();
+
+    if old_len == 0 || new_len == 0 {
+        return vec![];
+    }
+
+    // Build mapping: new_line_index -> old_line_index
+    let mut old_num: Vec<Option<usize>> = vec![None; new_len];
+
+    // Step 1: Find unique matches (hash appears exactly once in both old and new)
+    for new_i in 0..new_len {
+        let hash = new_hashes[new_i];
+        if hash == 0 {
+            continue; // Skip blank lines
+        }
+
+        // Count occurrences in new
+        let new_count = new_hashes.iter().filter(|&&h| h == hash).count();
+        if new_count != 1 {
+            continue; // Not unique in new
+        }
+
+        // Find in old
+        let old_matches: Vec<usize> = old_hashes
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| **h == hash)
+            .map(|(i, _)| i)
+            .collect();
+
+        if old_matches.len() == 1 {
+            // Unique match found
+            old_num[new_i] = Some(old_matches[0]);
+        }
+    }
+
+    // Step 2: Grow matches forward and backward
+    // If line N matched and N+1 also matches, extend the hunk
+    for new_i in 0..new_len {
+        if let Some(old_i) = old_num[new_i] {
+            // Try to extend forward
+            let mut offset = 1;
+            while new_i + offset < new_len
+                && old_i + offset < old_len
+                && old_num[new_i + offset].is_none()
+                && new_hashes[new_i + offset] == old_hashes[old_i + offset]
+                && new_hashes[new_i + offset] != 0
+            {
+                old_num[new_i + offset] = Some(old_i + offset);
+                offset += 1;
+            }
+
+            // Try to extend backward
+            offset = 1;
+            while new_i >= offset
+                && old_i >= offset
+                && old_num[new_i - offset].is_none()
+                && new_hashes[new_i - offset] == old_hashes[old_i - offset]
+                && new_hashes[new_i - offset] != 0
+            {
+                old_num[new_i - offset] = Some(old_i - offset);
+                offset += 1;
+            }
+        }
+    }
+
+    // Step 3: Find scroll hunks (contiguous regions with same shift)
+    let mut scrolls = Vec::new();
+    let mut i = 0;
+
+    while i < new_len {
+        if let Some(old_i) = old_num[i] {
+            let shift = old_i as isize - i as isize;
+
+            // Find contiguous region with same shift
+            let start = i;
+            let mut end = i;
+
+            while end + 1 < new_len {
+                if let Some(next_old) = old_num[end + 1] {
+                    let next_shift = next_old as isize - (end + 1) as isize;
+                    if next_shift == shift {
+                        end += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            let size = end - start + 1;
+
+            // Apply heuristics (from ncurses):
+            // - Minimum hunk size of 3 lines
+            // - Accept if efficient enough: size + min(size/8, 2) >= abs(shift)
+            let min_efficiency = size + (size / 8).min(2);
+            let shift_abs = shift.unsigned_abs();
+
+            if size >= 3 && min_efficiency >= shift_abs {
+                scrolls.push(ScrollOp {
+                    start,
+                    size,
+                    shift,
+                });
+            }
+
+            i = end + 1;
+        } else {
+            i += 1;
+        }
+    }
+
+    scrolls
 }
 
 #[cfg(test)]
@@ -267,5 +401,153 @@ mod tests {
         let line1 = vec![Cell::new(' '), Cell::new(' '), Cell::new(' ')];
         let line2 = vec![Cell::new(' '), Cell::new(' '), Cell::new(' ')];
         assert_eq!(hash_line(&line1), hash_line(&line2));
+    }
+
+    #[test]
+    fn test_detect_scrolls_empty() {
+        let old: Vec<u64> = vec![];
+        let new: Vec<u64> = vec![];
+        let scrolls = detect_scrolls(&old, &new);
+        assert_eq!(scrolls.len(), 0);
+    }
+
+    #[test]
+    fn test_detect_scrolls_no_match() {
+        // All different hashes - no scrolling detected
+        let old = vec![1, 2, 3, 4, 5];
+        let new = vec![6, 7, 8, 9, 10];
+        let scrolls = detect_scrolls(&old, &new);
+        assert_eq!(scrolls.len(), 0);
+    }
+
+    #[test]
+    fn test_detect_scrolls_scroll_up() {
+        // Lines 0-2 deleted, lines 3-7 moved up by 3
+        // Old: [1, 2, 3, A, B, C, D, E]
+        // New: [A, B, C, D, E, 4, 5, 6]
+        let old = vec![1, 2, 3, 100, 101, 102, 103, 104];
+        let new = vec![100, 101, 102, 103, 104, 4, 5, 6];
+        let scrolls = detect_scrolls(&old, &new);
+
+        assert_eq!(scrolls.len(), 1);
+        assert_eq!(scrolls[0].start, 0); // Lines now at position 0
+        assert_eq!(scrolls[0].size, 5); // 5 lines moved
+        assert_eq!(scrolls[0].shift, 3); // Moved up by 3 (from index 3 to 0)
+    }
+
+    #[test]
+    fn test_detect_scrolls_scroll_down() {
+        // Lines inserted at top, existing lines moved down
+        // Old: [A, B, C, D, E]
+        // New: [1, 2, 3, A, B, C, D, E]
+        let old = vec![100, 101, 102, 103, 104];
+        let new = vec![1, 2, 3, 100, 101, 102, 103, 104];
+        let scrolls = detect_scrolls(&old, &new);
+
+        assert_eq!(scrolls.len(), 1);
+        assert_eq!(scrolls[0].start, 3); // Lines now at position 3
+        assert_eq!(scrolls[0].size, 5); // 5 lines moved
+        assert_eq!(scrolls[0].shift, -3); // Moved down by 3 (from index 0 to 3)
+    }
+
+    #[test]
+    fn test_detect_scrolls_too_small_hunk() {
+        // Only 2 lines match - below minimum hunk size of 3
+        let old = vec![1, 100, 101, 2];
+        let new = vec![100, 101, 3, 4];
+        let scrolls = detect_scrolls(&old, &new);
+
+        // Should not detect scroll (hunk too small)
+        assert_eq!(scrolls.len(), 0);
+    }
+
+    #[test]
+    fn test_detect_scrolls_minimum_hunk_size() {
+        // Exactly 3 lines match - minimum hunk size
+        let old = vec![1, 100, 101, 102, 2];
+        let new = vec![100, 101, 102, 3, 4];
+        let scrolls = detect_scrolls(&old, &new);
+
+        assert_eq!(scrolls.len(), 1);
+        assert_eq!(scrolls[0].size, 3);
+    }
+
+    #[test]
+    fn test_detect_scrolls_ignore_blank_lines() {
+        // Blank lines (hash=0) should not be matched
+        let old = vec![0, 0, 100, 101, 102];
+        let new = vec![100, 101, 102, 0, 0];
+        let scrolls = detect_scrolls(&old, &new);
+
+        assert_eq!(scrolls.len(), 1);
+        assert_eq!(scrolls[0].start, 0);
+        assert_eq!(scrolls[0].size, 3);
+        assert_eq!(scrolls[0].shift, 2); // Moved from index 2 to 0
+    }
+
+    #[test]
+    fn test_detect_scrolls_duplicate_hashes() {
+        // Duplicate hashes should not be matched (not unique)
+        let old = vec![100, 100, 101, 102];
+        let new = vec![101, 102, 100, 100];
+        let scrolls = detect_scrolls(&old, &new);
+
+        // Only 101, 102 should match (unique hashes)
+        // But 2 lines is below minimum, so no scroll detected
+        assert_eq!(scrolls.len(), 0);
+    }
+
+    #[test]
+    fn test_detect_scrolls_grow_matches() {
+        // Should extend matches forward/backward
+        // Old: [1, A, B, C, D, 2]
+        // New: [A, B, C, D, 3, 4]
+        // Even if only A or C is unique, should match all A,B,C,D
+        let old = vec![1, 100, 101, 102, 103, 2];
+        let new = vec![100, 101, 102, 103, 3, 4];
+        let scrolls = detect_scrolls(&old, &new);
+
+        assert_eq!(scrolls.len(), 1);
+        assert_eq!(scrolls[0].size, 4); // All 4 lines matched
+    }
+
+    #[test]
+    fn test_detect_scrolls_efficiency_heuristic() {
+        // Heuristic: size + min(size/8, 2) >= abs(shift)
+        // Large shift with small hunk should be rejected
+        // Use unique values to avoid accidental matches
+        let old = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100, 101, 102];
+        let new = vec![100, 101, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let scrolls = detect_scrolls(&old, &new);
+
+        // shift = 10 (from position 10 to 0), size = 3
+        // min_efficiency = 3 + min(3/8, 2) = 3 + 0 = 3
+        // 3 < 10, so should be rejected
+        assert_eq!(scrolls.len(), 0);
+    }
+
+    #[test]
+    fn test_detect_scrolls_multiple_hunks() {
+        // Multiple independent scroll regions
+        // Make hunks large enough to pass efficiency heuristic
+        // size=8, shift=7: min_eff = 8+min(8/8,2) = 8+1 = 9 >= 7 ✓
+        // Old: [A,B,C,D,E,F,G,H, 0, X,Y,Z,W,V,U,T,S]
+        // New: [X,Y,Z,W,V,U,T,S, 0, A,B,C,D,E,F,G,H]
+        let old = vec![100, 101, 102, 103, 104, 105, 106, 107, 0, 200, 201, 202, 203, 204, 205, 206, 207];
+        let new = vec![200, 201, 202, 203, 204, 205, 206, 207, 0, 100, 101, 102, 103, 104, 105, 106, 107];
+        let scrolls = detect_scrolls(&old, &new);
+
+        // Should detect 2 separate scroll hunks
+        assert_eq!(scrolls.len(), 2);
+
+        // First hunk: moved from position 9 to 0 (shift = 9)
+        assert_eq!(scrolls[0].start, 0);
+        assert_eq!(scrolls[0].size, 8);
+        assert_eq!(scrolls[0].shift, 9);
+
+        // Second hunk: moved from position 0 to 9 (shift = -9)
+        assert_eq!(scrolls[1].start, 9);
+        assert_eq!(scrolls[1].size, 8);
+        assert_eq!(scrolls[1].shift, -9);
     }
 }

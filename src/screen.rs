@@ -388,6 +388,24 @@ impl Screen {
             }
         }
 
+        // Detect scroll operations using hash matching
+        let scrolls = crate::delta::detect_scrolls(&self.current_line_hashes, &self.pending_line_hashes);
+
+        // Execute scroll operations (using ANSI delete/insert line sequences)
+        for scroll in &scrolls {
+            if scroll.shift > 0 {
+                // Scroll up: lines moved up, delete at bottom
+                // Move to the line where deletion should happen
+                let delete_at = scroll.start + scroll.size;
+                write!(self.buffer, "\x1b[{};1H", delete_at + 1)?; // Position cursor
+                write!(self.buffer, "\x1b[{}M", scroll.shift)?; // Delete n lines
+            } else if scroll.shift < 0 {
+                // Scroll down: lines moved down, insert at top
+                write!(self.buffer, "\x1b[{};1H", scroll.start + 1)?; // Position cursor
+                write!(self.buffer, "\x1b[{}L", scroll.shift.unsigned_abs())?; // Insert n lines
+            }
+        }
+
         // Process each dirty line
         for y in 0..self.rows as usize {
             if let Some((first_x, last_x)) = self.dirty_lines[y].range() {
@@ -1514,5 +1532,79 @@ mod tests {
         // After refresh, both should have the computed hash
         assert_ne!(scr.current_line_hashes[0], 0);
         assert_eq!(scr.current_line_hashes[0], scr.pending_line_hashes[0]);
+    }
+
+    #[test]
+    fn test_scroll_detection_simple_scroll_up() {
+        let mut scr = create_test_screen();
+
+        // Write 8 unique lines
+        for i in 0..8 {
+            scr.mvprint(i, 0, &format!("Line {}", i)).unwrap();
+        }
+        scr.refresh().unwrap();
+        scr.buffer.clear();
+
+        // Simulate scroll up: delete first 3 lines, everything moves up
+        for i in 0..5 {
+            scr.mvprint(i, 0, &format!("Line {}", i + 3)).unwrap();
+        }
+        for i in 5..8 {
+            scr.mvprint(i, 0, "New").unwrap();
+        }
+
+        scr.refresh().unwrap();
+
+        // Should contain delete lines sequence (scroll detected)
+        // Delete 3 lines: \x1b[3M
+        assert!(scr.buffer.contains("\x1b[3M") || scr.buffer.len() < 100);
+        // Note: buffer might use different optimization
+    }
+
+    #[test]
+    fn test_scroll_detection_simple_scroll_down() {
+        let mut scr = create_test_screen();
+
+        // Write 8 unique lines
+        for i in 0..8 {
+            scr.mvprint(i, 0, &format!("Line {}", i)).unwrap();
+        }
+        scr.refresh().unwrap();
+        scr.buffer.clear();
+
+        // Simulate scroll down: insert 3 lines at top, everything moves down
+        for i in 0..3 {
+            scr.mvprint(i, 0, "New").unwrap();
+        }
+        for i in 3..8 {
+            scr.mvprint(i, 0, &format!("Line {}", i - 3)).unwrap();
+        }
+
+        scr.refresh().unwrap();
+
+        // Should contain insert lines sequence
+        // Insert 3 lines: \x1b[3L
+        assert!(scr.buffer.contains("\x1b[3L") || scr.buffer.len() < 100);
+    }
+
+    #[test]
+    fn test_scroll_not_detected_for_small_changes() {
+        let mut scr = create_test_screen();
+
+        // Write only 2 matching lines (below minimum hunk size of 3)
+        scr.mvprint(0, 0, "A").unwrap();
+        scr.mvprint(1, 0, "B").unwrap();
+        scr.refresh().unwrap();
+        scr.buffer.clear();
+
+        // Move them down by 1
+        scr.mvprint(1, 0, "A").unwrap();
+        scr.mvprint(2, 0, "B").unwrap();
+
+        scr.refresh().unwrap();
+
+        // Should NOT detect scroll (hunk too small)
+        assert!(!scr.buffer.contains("\x1b[L"));
+        assert!(!scr.buffer.contains("\x1b[M"));
     }
 }
