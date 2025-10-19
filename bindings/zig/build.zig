@@ -25,31 +25,27 @@ pub fn build(b: *std.Build) void {
     basic_exe.linkLibC();
     b.installArtifact(basic_exe);
 
-    // Mosaic example
-    const mosaic_exe = b.addExecutable(.{
-        .name = "mosaic",
-        .root_source_file = b.path("examples/mosaic.zig"),
+    // Colors RGB example
+    const colors_exe = b.addExecutable(.{
+        .name = "colors-rgb",
+        .root_source_file = b.path("examples/colors-rgb.zig"),
         .target = target,
         .optimize = optimize,
     });
-    mosaic_exe.root_module.addImport("zaz", zaz_mod);
-    mosaic_exe.addIncludePath(.{ .cwd_relative = "." });
-    mosaic_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
-    mosaic_exe.linkSystemLibrary("zaz");
-    mosaic_exe.addCSourceFile(.{
-        .file = b.path("image_loader.c"),
-        .flags = &[_][]const u8{"-std=c99"},
-    });
-    mosaic_exe.linkLibC();
-    b.installArtifact(mosaic_exe);
+    colors_exe.root_module.addImport("zaz", zaz_mod);
+    colors_exe.addIncludePath(.{ .cwd_relative = "." });
+    colors_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
+    colors_exe.linkSystemLibrary("zaz");
+    colors_exe.linkLibC();
+    b.installArtifact(colors_exe);
 
     // Run commands
     const run_basic = b.addRunArtifact(basic_exe);
-    const run_mosaic = b.addRunArtifact(mosaic_exe);
+    const run_colors = b.addRunArtifact(colors_exe);
 
     const run_basic_step = b.step("run-basic", "Run basic example");
     run_basic_step.dependOn(&run_basic.step);
 
-    const run_mosaic_step = b.step("run-mosaic", "Run mosaic example");
-    run_mosaic_step.dependOn(&run_mosaic.step);
+    const run_colors_step = b.step("run-colors", "Run colors-rgb example");
+    run_colors_step.dependOn(&run_colors.step);
 }
