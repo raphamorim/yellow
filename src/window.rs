@@ -14,14 +14,14 @@ pub struct Window {
     cursor_x: u16,
     cursor_y: u16,
     current_attr: Attr,
-    current_fg: Option<Color>,
-    current_bg: Option<Color>,
+    current_fg: Color,
+    current_bg: Color,
     buffer: String,
     scroll_enabled: bool,
     // Performance optimization: track last emitted style to avoid redundant codes
     last_emitted_attr: Attr,
-    last_emitted_fg: Option<Color>,
-    last_emitted_bg: Option<Color>,
+    last_emitted_fg: Color,
+    last_emitted_bg: Color,
     // Performance optimization: SmallVec for style sequence (stack-allocated for <64 bytes)
     style_sequence_buf: SmallVec<[u8; 64]>,
 }
@@ -40,13 +40,13 @@ impl Window {
             cursor_x: 0,
             cursor_y: 0,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             buffer: String::with_capacity(estimated_capacity),
             scroll_enabled: false,
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(), // Stack-allocated for sequences <64 bytes
         })
     }
@@ -161,13 +161,13 @@ impl Window {
 
     /// Set foreground color
     pub fn set_fg(&mut self, color: Color) -> Result<()> {
-        self.current_fg = Some(color);
+        self.current_fg = color;
         Ok(())
     }
 
     /// Set background color
     pub fn set_bg(&mut self, color: Color) -> Result<()> {
-        self.current_bg = Some(color);
+        self.current_bg = color;
         Ok(())
     }
 
@@ -335,25 +335,21 @@ impl Window {
         // Add color codes if changed (using temporary buffer for String conversion)
         let mut color_buf = String::with_capacity(20);
         if self.current_fg != self.last_emitted_fg {
-            if let Some(fg) = &self.current_fg {
-                if needs_separator {
-                    self.style_sequence_buf.push(b';');
-                }
-                color_buf.clear();
-                fg.write_ansi_fg(&mut color_buf);
-                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
-                needs_separator = true;
+            if needs_separator {
+                self.style_sequence_buf.push(b';');
             }
+            color_buf.clear();
+            self.current_fg.write_ansi_fg(&mut color_buf);
+            self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+            needs_separator = true;
         }
         if self.current_bg != self.last_emitted_bg {
-            if let Some(bg) = &self.current_bg {
-                if needs_separator {
-                    self.style_sequence_buf.push(b';');
-                }
-                color_buf.clear();
-                bg.write_ansi_bg(&mut color_buf);
-                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+            if needs_separator {
+                self.style_sequence_buf.push(b';');
             }
+            color_buf.clear();
+            self.current_bg.write_ansi_bg(&mut color_buf);
+            self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
         }
 
         if !self.style_sequence_buf.is_empty() {
@@ -431,8 +427,8 @@ mod tests {
         win.set_fg(Color::Red).unwrap();
         win.set_bg(Color::Blue).unwrap();
 
-        assert_eq!(win.current_fg, Some(Color::Red));
-        assert_eq!(win.current_bg, Some(Color::Blue));
+        assert_eq!(win.current_fg, Color::Red);
+        assert_eq!(win.current_bg, Color::Blue);
     }
 
     #[test]

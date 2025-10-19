@@ -27,7 +27,6 @@ mod image;
 mod input;
 mod kitty;
 mod mosaic;
-mod packed_color;
 mod panel;
 mod platform_io;
 mod screen;

@@ -65,8 +65,8 @@ fn bench_hash_functions(c: &mut Criterion) {
             .map(|i| Cell::with_style(
                 (b'A' + (i % 26) as u8) as char,
                 if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                if i % 3 == 0 { Some(Color::Red) } else { None },
-                if i % 5 == 0 { Some(Color::Blue) } else { None },
+                if i % 3 == 0 { Color::Red } else { Color::Reset },
+                if i % 5 == 0 { Color::Blue } else { Color::Reset },
             ))
             .collect();
 
@@ -142,8 +142,8 @@ fn bench_hash_consistency(c: &mut Criterion) {
         .map(|i| Cell::with_style(
             (b'A' + (i % 26) as u8) as char,
             Attr::BOLD,
-            Some(Color::Red),
-            None,
+            Color::Red,
+            Color::Reset,
         ))
         .collect();
 

@@ -126,10 +126,10 @@ fn bench_style_caching(c: &mut Criterion) {
     c.bench_function("style_comparison_overhead", |b| {
         let attr1 = Attr::BOLD;
         let attr2 = Attr::BOLD;
-        let fg1 = Some(Color::Red);
-        let fg2 = Some(Color::Red);
-        let bg1 = Some(Color::Blue);
-        let bg2 = Some(Color::Blue);
+        let fg1 = Color::Red;
+        let fg2 = Color::Red;
+        let bg1 = Color::Blue;
+        let bg2 = Color::Blue;
 
         b.iter(|| {
             let changed = attr1 != attr2 || fg1 != fg2 || bg1 != bg2;
@@ -141,9 +141,9 @@ fn bench_style_caching(c: &mut Criterion) {
         let cells: Vec<Cell> = (0..80)
             .map(|i| {
                 if i < 40 {
-                    Cell::with_style('A', Attr::BOLD, Some(Color::Red), None)
+                    Cell::with_style('A', Attr::BOLD, Color::Red, Color::Reset)
                 } else {
-                    Cell::with_style('B', Attr::UNDERLINE, Some(Color::Blue), None)
+                    Cell::with_style('B', Attr::UNDERLINE, Color::Blue, Color::Reset)
                 }
             })
             .collect();
@@ -212,8 +212,8 @@ fn bench_line_rendering(c: &mut Criterion) {
             .map(|i| Cell::with_style(
                 (b'A' + (i % 26) as u8) as char,
                 if i % 10 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                if i % 7 == 0 { Some(Color::Red) } else { None },
-                None,
+                if i % 7 == 0 { Color::Red } else { Color::Reset },
+                Color::Reset,
             ))
             .collect();
 

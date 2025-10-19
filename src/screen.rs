@@ -17,15 +17,15 @@ pub struct Screen {
     rows: u16,
     cols: u16,
     current_attr: Attr,
-    current_fg: Option<Color>,
-    current_bg: Option<Color>,
+    current_fg: Color,
+    current_bg: Color,
     color_pairs: HashMap<u8, ColorPair>,
     cursor_visible: bool,
     buffer: String,
     // Performance optimization: track last emitted style to avoid redundant codes
     last_emitted_attr: Attr,
-    last_emitted_fg: Option<Color>,
-    last_emitted_bg: Option<Color>,
+    last_emitted_fg: Color,
+    last_emitted_bg: Color,
     // Performance optimization: SmallVec for ANSI sequences (stack-allocated for <64 bytes)
     // Most style sequences are <64 bytes, avoiding heap allocation in 95%+ of cases
     style_sequence_buf: SmallVec<[u8; 64]>,
@@ -68,14 +68,14 @@ impl Screen {
             rows,
             cols,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::with_capacity(estimated_capacity),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(), // Stack-allocated for sequences <64 bytes
             current_content,
             pending_content,
@@ -228,20 +228,20 @@ impl Screen {
             .color_pairs
             .get(&pair)
             .ok_or(Error::InvalidColorPair(pair))?;
-        self.current_fg = Some(color_pair.fg);
-        self.current_bg = Some(color_pair.bg);
+        self.current_fg = color_pair.fg;
+        self.current_bg = color_pair.bg;
         Ok(())
     }
 
     /// Set foreground color
     pub fn set_fg(&mut self, color: Color) -> Result<()> {
-        self.current_fg = Some(color);
+        self.current_fg = color;
         Ok(())
     }
 
     /// Set background color
     pub fn set_bg(&mut self, color: Color) -> Result<()> {
-        self.current_bg = Some(color);
+        self.current_bg = color;
         Ok(())
     }
 
@@ -558,23 +558,22 @@ impl Screen {
                                 // Add color codes using temporary string
                                 // (write_ansi_fg/bg expect String, so we still need this)
                                 let mut color_buf = String::with_capacity(20);
-                                if let Some(fg) = cell_style.1 {
-                                    if needs_separator {
-                                        self.style_sequence_buf.push(b';');
-                                    }
-                                    color_buf.clear();
-                                    fg.write_ansi_fg(&mut color_buf);
-                                    self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
-                                    needs_separator = true;
+                                let fg = cell_style.1;
+                                if needs_separator {
+                                    self.style_sequence_buf.push(b';');
                                 }
-                                if let Some(bg) = cell_style.2 {
-                                    if needs_separator {
-                                        self.style_sequence_buf.push(b';');
-                                    }
-                                    color_buf.clear();
-                                    bg.write_ansi_bg(&mut color_buf);
-                                    self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+                                color_buf.clear();
+                                fg.write_ansi_fg(&mut color_buf);
+                                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+                                needs_separator = true;
+
+                                let bg = cell_style.2;
+                                if needs_separator {
+                                    self.style_sequence_buf.push(b';');
                                 }
+                                color_buf.clear();
+                                bg.write_ansi_bg(&mut color_buf);
+                                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
 
                                 // Emit ANSI sequence if we added any codes
                                 if !self.style_sequence_buf.is_empty() {
@@ -589,8 +588,8 @@ impl Screen {
                             // Output character (with RLE optimization for spaces)
                             if cell.ch == ' '
                                 && cell.attr == Attr::NORMAL
-                                && cell.fg().is_none()
-                                && cell.bg().is_none()
+                                && cell.fg() == Color::Reset
+                                && cell.bg() == Color::Reset
                             {
                                 // Check for run of blank spaces
                                 let mut run_length = 1;
@@ -751,14 +750,14 @@ mod tests {
             rows,
             cols,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             current_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             pending_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
@@ -810,8 +809,8 @@ mod tests {
         scr.init_pair(1, Color::Red, Color::Black).unwrap();
         scr.color_pair(1).unwrap();
 
-        assert_eq!(scr.current_fg, Some(Color::Red));
-        assert_eq!(scr.current_bg, Some(Color::Black));
+        assert_eq!(scr.current_fg, Color::Red);
+        assert_eq!(scr.current_bg, Color::Black);
     }
 
     #[test]
@@ -949,8 +948,8 @@ mod tests {
         scr.print("Bold").unwrap();
         scr.refresh().unwrap();
 
-        // Should contain bold code (1)
-        assert!(scr.buffer.contains("\x1b[1m"));
+        // Should contain bold code (1) and color resets (39;49)
+        assert!(scr.buffer.contains("\x1b[1;39;49m"));
     }
 
     #[test]
@@ -989,8 +988,8 @@ mod tests {
         scr.print("Normal").unwrap();
         scr.refresh().unwrap();
 
-        // Should contain reset code (0)
-        assert!(scr.buffer.contains("\x1b[0m"));
+        // Should contain reset code (0) and color resets (39;49)
+        assert!(scr.buffer.contains("\x1b[0;39;49m"));
     }
 
     #[test]
@@ -1015,8 +1014,8 @@ mod tests {
             rows: 24,
             cols: 80,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: {
@@ -1025,8 +1024,8 @@ mod tests {
                 String::with_capacity(estimated_capacity)
             },
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1053,8 +1052,8 @@ mod tests {
             rows: 24,
             cols: 80,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: {
@@ -1063,8 +1062,8 @@ mod tests {
                 String::with_capacity(estimated_capacity)
             },
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1087,14 +1086,14 @@ mod tests {
             cursor_x: 0,
             cursor_y: 0,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::with_capacity(1000),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1127,14 +1126,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1162,14 +1161,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1197,14 +1196,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1232,14 +1231,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1267,14 +1266,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1302,14 +1301,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,
@@ -1337,14 +1336,14 @@ mod tests {
             cursor_x: 10,
             cursor_y: 5,
             current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
+            current_fg: Color::Reset,
+            current_bg: Color::Reset,
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
             last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
+            last_emitted_fg: Color::Reset,
+            last_emitted_bg: Color::Reset,
             style_sequence_buf: SmallVec::new(),
             rows: 24,
             cols: 80,

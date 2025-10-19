@@ -19,8 +19,8 @@ fn bench_cell_creation(c: &mut Criterion) {
             black_box(Cell::with_style(
                 'X',
                 Attr::BOLD | Attr::UNDERLINE,
-                Some(Color::Red),
-                Some(Color::Blue),
+                Color::Red,
+                Color::Blue,
             ))
         });
     });
@@ -30,8 +30,8 @@ fn bench_cell_clone(c: &mut Criterion) {
     let cell = Cell::with_style(
         'X',
         Attr::BOLD | Attr::UNDERLINE,
-        Some(Color::Red),
-        Some(Color::Blue),
+        Color::Red,
+        Color::Blue,
     );
 
     c.bench_function("cell_clone", |b| {
@@ -42,9 +42,9 @@ fn bench_cell_clone(c: &mut Criterion) {
 }
 
 fn bench_cell_comparison(c: &mut Criterion) {
-    let cell1 = Cell::with_style('A', Attr::BOLD, Some(Color::Red), None);
-    let cell2 = Cell::with_style('A', Attr::BOLD, Some(Color::Red), None);
-    let cell3 = Cell::with_style('B', Attr::UNDERLINE, Some(Color::Blue), None);
+    let cell1 = Cell::with_style('A', Attr::BOLD, Color::Red, Color::Reset);
+    let cell2 = Cell::with_style('A', Attr::BOLD, Color::Red, Color::Reset);
+    let cell3 = Cell::with_style('B', Attr::UNDERLINE, Color::Blue, Color::Reset);
 
     c.bench_function("cell_eq_same", |b| {
         b.iter(|| {
@@ -112,8 +112,8 @@ fn bench_cell_memory_size(c: &mut Criterion) {
                 .map(|i| Cell::with_style(
                     (b'A' + (i % 26) as u8) as char,
                     if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                    if i % 3 == 0 { Some(Color::Red) } else { None },
-                    if i % 5 == 0 { Some(Color::Blue) } else { None },
+                    if i % 3 == 0 { Color::Red } else { Color::Reset },
+                    if i % 5 == 0 { Color::Blue } else { Color::Reset },
                 ))
                 .collect();
             black_box(cells)

@@ -144,13 +144,10 @@ pub fn hash_line(cells: &[Cell]) -> u64 {
         // Optimized: hash colors using discriminant+data approach (2-3x faster)
         // Converts color to (type_byte, data_u32) to minimize branches
         #[inline(always)]
-        fn hash_color(hash: &mut u64, color: Option<Color>) {
+        fn hash_color(hash: &mut u64, color: Color) {
             const FNV_PRIME: u64 = 0x100000001b3;
 
-            let (disc, data) = match color {
-                None => (0u8, 0u32),
-                Some(c) => c.hash_bytes(),
-            };
+            let (disc, data) = color.hash_bytes();
 
             // Hash discriminant
             *hash ^= disc as u64;
@@ -389,7 +386,7 @@ mod tests {
     #[test]
     fn test_find_line_diff_style_change() {
         let line1 = vec![Cell::new('A')];
-        let line2 = vec![Cell::with_style('A', Attr::BOLD, None, None)];
+        let line2 = vec![Cell::with_style('A', Attr::BOLD, Color::Reset, Color::Reset)];
         assert_eq!(find_line_diff(&line1, &line2), Some((0, 0)));
     }
 
@@ -410,14 +407,14 @@ mod tests {
     #[test]
     fn test_hash_line_different_attrs() {
         let line1 = vec![Cell::new('A')];
-        let line2 = vec![Cell::with_style('A', Attr::BOLD, None, None)];
+        let line2 = vec![Cell::with_style('A', Attr::BOLD, Color::Reset, Color::Reset)];
         assert_ne!(hash_line(&line1), hash_line(&line2));
     }
 
     #[test]
     fn test_hash_line_different_colors() {
-        let line1 = vec![Cell::with_style('A', Attr::NORMAL, Some(Color::Red), None)];
-        let line2 = vec![Cell::with_style('A', Attr::NORMAL, Some(Color::Blue), None)];
+        let line1 = vec![Cell::with_style('A', Attr::NORMAL, Color::Red, Color::Reset)];
+        let line2 = vec![Cell::with_style('A', Attr::NORMAL, Color::Blue, Color::Reset)];
         assert_ne!(hash_line(&line1), hash_line(&line2));
     }
 
