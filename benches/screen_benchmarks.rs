@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use zaz::{Cell, Attr, Color};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::fmt::Write as FmtWrite;
+use zaz::{Attr, Cell, Color};
 
 // Simulate output buffer operations
 
@@ -209,38 +209,40 @@ fn bench_line_rendering(c: &mut Criterion) {
 
     for width in [40, 80, 132, 200].iter() {
         let cells: Vec<Cell> = (0..*width)
-            .map(|i| Cell::with_style(
-                (b'A' + (i % 26) as u8) as char,
-                if i % 10 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                if i % 7 == 0 { Color::Red } else { Color::Reset },
-                Color::Reset,
-            ))
+            .map(|i| {
+                Cell::with_style(
+                    (b'A' + (i % 26) as u8) as char,
+                    if i % 10 == 0 {
+                        Attr::BOLD
+                    } else {
+                        Attr::NORMAL
+                    },
+                    if i % 7 == 0 { Color::Red } else { Color::Reset },
+                    Color::Reset,
+                )
+            })
             .collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("full_line", width),
-            &cells,
-            |b, cells| {
-                let mut buffer = String::with_capacity(2000);
-                let mut last_style = (Attr::NORMAL, None, None);
+        group.bench_with_input(BenchmarkId::new("full_line", width), &cells, |b, cells| {
+            let mut buffer = String::with_capacity(2000);
+            let mut last_style = (Attr::NORMAL, None, None);
 
-                b.iter(|| {
-                    buffer.clear();
-                    last_style = (Attr::NORMAL, None, None);
+            b.iter(|| {
+                buffer.clear();
+                last_style = (Attr::NORMAL, None, None);
 
-                    for cell in cells {
-                        let current_style = (cell.attr, cell.fg(), cell.bg());
-                        if current_style != last_style {
-                            // Simplified style application
-                            write!(buffer, "\x1b[0m").unwrap();
-                            last_style = current_style;
-                        }
-                        buffer.push(cell.ch);
+                for cell in cells {
+                    let current_style = (cell.attr, cell.fg(), cell.bg());
+                    if current_style != last_style {
+                        // Simplified style application
+                        write!(buffer, "\x1b[0m").unwrap();
+                        last_style = current_style;
                     }
-                    black_box(&buffer);
-                });
-            },
-        );
+                    buffer.push(cell.ch);
+                }
+                black_box(&buffer);
+            });
+        });
     }
 
     group.finish();
@@ -253,12 +255,18 @@ fn bench_full_screen_simulation(c: &mut Criterion) {
         let screen: Vec<Vec<Cell>> = (0..rows)
             .map(|row| {
                 (0..cols)
-                    .map(|col| Cell::with_style(
-                        ((row + col) % 94 + 33) as u8 as char,
-                        if (row + col) % 5 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                        None,
-                        None,
-                    ))
+                    .map(|col| {
+                        Cell::with_style(
+                            ((row + col) % 94 + 33) as u8 as char,
+                            if (row + col) % 5 == 0 {
+                                Attr::BOLD
+                            } else {
+                                Attr::NORMAL
+                            },
+                            None,
+                            None,
+                        )
+                    })
                     .collect()
             })
             .collect();

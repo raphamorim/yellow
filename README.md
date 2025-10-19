@@ -1,12 +1,10 @@
 # Zaz
 
-A terminal manipulation library for Rust and C/FFI bindings for other languages.
+> A terminal manipulation library for Rust and C/FFI bindings for other languages.
 
-<img src="examples/resources/demo.png" alt="Zaz's mosaic demo" width="412">
-
-Zaz's mosaic demo with Zig wrapper
-
-<img src="examples/resources/demo-bindings-zig.png" alt="Zaz's mosaic demo with Zig wrapper" width="412">
+| Rust      | Zig |
+| ----------- | ----------- |
+| <img src="examples/resources/demo.png" alt="Zaz's mosaic demo">      | <img src="examples/resources/demo-bindings-zig.png" alt="Zaz's mosaic demo with Zig wrapper">       |
 
 ## Features
 

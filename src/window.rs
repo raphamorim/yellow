@@ -340,7 +340,8 @@ impl Window {
             }
             color_buf.clear();
             self.current_fg.write_ansi_fg(&mut color_buf);
-            self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+            self.style_sequence_buf
+                .extend_from_slice(color_buf.as_bytes());
             needs_separator = true;
         }
         if self.current_bg != self.last_emitted_bg {
@@ -349,14 +350,14 @@ impl Window {
             }
             color_buf.clear();
             self.current_bg.write_ansi_bg(&mut color_buf);
-            self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+            self.style_sequence_buf
+                .extend_from_slice(color_buf.as_bytes());
         }
 
         if !self.style_sequence_buf.is_empty() {
             self.buffer.push_str("\x1b[");
-            self.buffer.push_str(
-                std::str::from_utf8(&self.style_sequence_buf).unwrap()
-            );
+            self.buffer
+                .push_str(std::str::from_utf8(&self.style_sequence_buf).unwrap());
             self.buffer.push('m');
         }
 

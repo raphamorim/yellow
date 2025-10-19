@@ -1,8 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use zaz::{Cell, Attr, Color};
-use zaz::__bench::hash_line;
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use zaz::__bench::hash_line;
+use zaz::{Attr, Cell, Color};
 
 // Current hash implementation (multiplication-based)
 fn hash_line_multiply(cells: &[Cell]) -> u64 {
@@ -62,53 +62,39 @@ fn bench_hash_functions(c: &mut Criterion) {
 
     for size in [10, 50, 80, 200, 1000].iter() {
         let line: Vec<Cell> = (0..*size)
-            .map(|i| Cell::with_style(
-                (b'A' + (i % 26) as u8) as char,
-                if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                if i % 3 == 0 { Color::Red } else { Color::Reset },
-                if i % 5 == 0 { Color::Blue } else { Color::Reset },
-            ))
+            .map(|i| {
+                Cell::with_style(
+                    (b'A' + (i % 26) as u8) as char,
+                    if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
+                    if i % 3 == 0 { Color::Red } else { Color::Reset },
+                    if i % 5 == 0 {
+                        Color::Blue
+                    } else {
+                        Color::Reset
+                    },
+                )
+            })
             .collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("current", size),
-            &line,
-            |b, line| {
-                b.iter(|| black_box(hash_line(line)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("current", size), &line, |b, line| {
+            b.iter(|| black_box(hash_line(line)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("multiply", size),
-            &line,
-            |b, line| {
-                b.iter(|| black_box(hash_line_multiply(line)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("multiply", size), &line, |b, line| {
+            b.iter(|| black_box(hash_line_multiply(line)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("fnv1a", size),
-            &line,
-            |b, line| {
-                b.iter(|| black_box(hash_line_fnv1a(line)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("fnv1a", size), &line, |b, line| {
+            b.iter(|| black_box(hash_line_fnv1a(line)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("std", size),
-            &line,
-            |b, line| {
-                b.iter(|| black_box(hash_line_std(line)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("std", size), &line, |b, line| {
+            b.iter(|| black_box(hash_line_std(line)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("xxhash_simple", size),
-            &line,
-            |b, line| {
-                b.iter(|| black_box(hash_line_xxhash_simple(line)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("xxhash_simple", size), &line, |b, line| {
+            b.iter(|| black_box(hash_line_xxhash_simple(line)));
+        });
     }
 
     group.finish();
@@ -139,12 +125,14 @@ fn bench_hash_collision_rate(c: &mut Criterion) {
 
 fn bench_hash_consistency(c: &mut Criterion) {
     let line: Vec<Cell> = (0..80)
-        .map(|i| Cell::with_style(
-            (b'A' + (i % 26) as u8) as char,
-            Attr::BOLD,
-            Color::Red,
-            Color::Reset,
-        ))
+        .map(|i| {
+            Cell::with_style(
+                (b'A' + (i % 26) as u8) as char,
+                Attr::BOLD,
+                Color::Red,
+                Color::Reset,
+            )
+        })
         .collect();
 
     c.bench_function("hash_consistency_check", |b| {
@@ -175,10 +163,7 @@ fn bench_hash_screen_lines(c: &mut Criterion) {
             &screen,
             |b, screen: &Vec<Vec<Cell>>| {
                 b.iter(|| {
-                    let hashes: Vec<u64> = screen
-                        .iter()
-                        .map(|line| hash_line(line))
-                        .collect();
+                    let hashes: Vec<u64> = screen.iter().map(|line| hash_line(line)).collect();
                     black_box(hashes)
                 });
             },

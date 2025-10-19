@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::io::Write;
 
 // Benchmark comparing buffered stdout vs direct I/O
@@ -9,16 +9,12 @@ fn bench_stdout_buffered(c: &mut Criterion) {
     for size in [100, 1000, 10000].iter() {
         let data = "X".repeat(*size);
 
-        group.bench_with_input(
-            BenchmarkId::new("write_all", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    std::io::stdout().write_all(data.as_bytes()).unwrap();
-                    black_box(());
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("write_all", size), &data, |b, data| {
+            b.iter(|| {
+                std::io::stdout().write_all(data.as_bytes()).unwrap();
+                black_box(());
+            });
+        });
 
         group.bench_with_input(
             BenchmarkId::new("write_all_flush", size),
@@ -42,16 +38,12 @@ fn bench_direct_io(c: &mut Criterion) {
     for size in [100, 1000, 10000].iter() {
         let data = "X".repeat(*size);
 
-        group.bench_with_input(
-            BenchmarkId::new("write_stdout", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    zaz::__bench_io::write_stdout(data.as_bytes()).unwrap();
-                    black_box(());
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("write_stdout", size), &data, |b, data| {
+            b.iter(|| {
+                zaz::__bench_io::write_stdout(data.as_bytes()).unwrap();
+                black_box(());
+            });
+        });
 
         group.bench_with_input(
             BenchmarkId::new("write_all_stdout", size),

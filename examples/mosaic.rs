@@ -32,8 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 3: Smaller width (30 cells)
     println!("\n3. Smaller Size (30 cells wide):");
-    let config3 = MosaicConfig::with_width(30)
-        .symbols(SymbolSet::Quarter);
+    let config3 = MosaicConfig::with_width(30).symbols(SymbolSet::Quarter);
     let art3 = render_mosaic(data, width as usize, height as usize, &config3);
     println!("{}", art3);
 

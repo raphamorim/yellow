@@ -57,11 +57,11 @@ pub use window::Window;
 #[doc(hidden)]
 pub mod __bench {
     pub use crate::cell::Cell;
-    pub use crate::delta::{DirtyRegion, find_line_diff, hash_line, detect_scrolls};
+    pub use crate::delta::{DirtyRegion, detect_scrolls, find_line_diff, hash_line};
 }
 
 // Re-export I/O functions for benchmarking
 #[doc(hidden)]
 pub mod __bench_io {
-    pub use crate::platform_io::{write_stdout, write_all_stdout};
+    pub use crate::platform_io::{write_all_stdout, write_stdout};
 }

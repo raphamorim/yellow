@@ -1,5 +1,5 @@
-use crate::cell::Cell;
 use crate::Color;
+use crate::cell::Cell;
 
 /// Represents a dirty region within a line
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,10 +176,7 @@ pub fn hash_line(cells: &[Cell]) -> u64 {
 
 /// Detect scroll operations using hash-based line matching (Modified Heckel's Algorithm)
 /// Inspired by ncurses hashmap.c
-pub fn detect_scrolls(
-    old_hashes: &[u64],
-    new_hashes: &[u64],
-) -> Vec<ScrollOp> {
+pub fn detect_scrolls(old_hashes: &[u64], new_hashes: &[u64]) -> Vec<ScrollOp> {
     let old_len = old_hashes.len();
     let new_len = new_hashes.len();
 
@@ -281,11 +278,7 @@ pub fn detect_scrolls(
             let shift_abs = shift.unsigned_abs();
 
             if size >= 3 && min_efficiency >= shift_abs {
-                scrolls.push(ScrollOp {
-                    start,
-                    size,
-                    shift,
-                });
+                scrolls.push(ScrollOp { start, size, shift });
             }
 
             i = end + 1;
@@ -386,7 +379,12 @@ mod tests {
     #[test]
     fn test_find_line_diff_style_change() {
         let line1 = vec![Cell::new('A')];
-        let line2 = vec![Cell::with_style('A', Attr::BOLD, Color::Reset, Color::Reset)];
+        let line2 = vec![Cell::with_style(
+            'A',
+            Attr::BOLD,
+            Color::Reset,
+            Color::Reset,
+        )];
         assert_eq!(find_line_diff(&line1, &line2), Some((0, 0)));
     }
 
@@ -407,14 +405,29 @@ mod tests {
     #[test]
     fn test_hash_line_different_attrs() {
         let line1 = vec![Cell::new('A')];
-        let line2 = vec![Cell::with_style('A', Attr::BOLD, Color::Reset, Color::Reset)];
+        let line2 = vec![Cell::with_style(
+            'A',
+            Attr::BOLD,
+            Color::Reset,
+            Color::Reset,
+        )];
         assert_ne!(hash_line(&line1), hash_line(&line2));
     }
 
     #[test]
     fn test_hash_line_different_colors() {
-        let line1 = vec![Cell::with_style('A', Attr::NORMAL, Color::Red, Color::Reset)];
-        let line2 = vec![Cell::with_style('A', Attr::NORMAL, Color::Blue, Color::Reset)];
+        let line1 = vec![Cell::with_style(
+            'A',
+            Attr::NORMAL,
+            Color::Red,
+            Color::Reset,
+        )];
+        let line2 = vec![Cell::with_style(
+            'A',
+            Attr::NORMAL,
+            Color::Blue,
+            Color::Reset,
+        )];
         assert_ne!(hash_line(&line1), hash_line(&line2));
     }
 
@@ -563,8 +576,12 @@ mod tests {
         // size=8, shift=7: min_eff = 8+min(8/8,2) = 8+1 = 9 >= 7 ✓
         // Old: [A,B,C,D,E,F,G,H, 0, X,Y,Z,W,V,U,T,S]
         // New: [X,Y,Z,W,V,U,T,S, 0, A,B,C,D,E,F,G,H]
-        let old = vec![100, 101, 102, 103, 104, 105, 106, 107, 0, 200, 201, 202, 203, 204, 205, 206, 207];
-        let new = vec![200, 201, 202, 203, 204, 205, 206, 207, 0, 100, 101, 102, 103, 104, 105, 106, 107];
+        let old = vec![
+            100, 101, 102, 103, 104, 105, 106, 107, 0, 200, 201, 202, 203, 204, 205, 206, 207,
+        ];
+        let new = vec![
+            200, 201, 202, 203, 204, 205, 206, 207, 0, 100, 101, 102, 103, 104, 105, 106, 107,
+        ];
         let scrolls = detect_scrolls(&old, &new);
 
         // Should detect 2 separate scroll hunks

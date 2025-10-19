@@ -1,17 +1,13 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use zaz::{Cell, Attr, Color};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use zaz::{Attr, Cell, Color};
 
 fn bench_cell_creation(c: &mut Criterion) {
     c.bench_function("cell_new", |b| {
-        b.iter(|| {
-            black_box(Cell::new('A'))
-        });
+        b.iter(|| black_box(Cell::new('A')));
     });
 
     c.bench_function("cell_blank", |b| {
-        b.iter(|| {
-            black_box(Cell::blank())
-        });
+        b.iter(|| black_box(Cell::blank()));
     });
 
     c.bench_function("cell_with_style", |b| {
@@ -27,17 +23,10 @@ fn bench_cell_creation(c: &mut Criterion) {
 }
 
 fn bench_cell_clone(c: &mut Criterion) {
-    let cell = Cell::with_style(
-        'X',
-        Attr::BOLD | Attr::UNDERLINE,
-        Color::Red,
-        Color::Blue,
-    );
+    let cell = Cell::with_style('X', Attr::BOLD | Attr::UNDERLINE, Color::Red, Color::Blue);
 
     c.bench_function("cell_clone", |b| {
-        b.iter(|| {
-            black_box(cell.clone())
-        });
+        b.iter(|| black_box(cell.clone()));
     });
 }
 
@@ -47,21 +36,15 @@ fn bench_cell_comparison(c: &mut Criterion) {
     let cell3 = Cell::with_style('B', Attr::UNDERLINE, Color::Blue, Color::Reset);
 
     c.bench_function("cell_eq_same", |b| {
-        b.iter(|| {
-            black_box(cell1 == cell2)
-        });
+        b.iter(|| black_box(cell1 == cell2));
     });
 
     c.bench_function("cell_eq_different", |b| {
-        b.iter(|| {
-            black_box(cell1 == cell3)
-        });
+        b.iter(|| black_box(cell1 == cell3));
     });
 
     c.bench_function("cell_same_style", |b| {
-        b.iter(|| {
-            black_box(cell1.same_style(&cell2))
-        });
+        b.iter(|| black_box(cell1.same_style(&cell2)));
     });
 }
 
@@ -78,27 +61,33 @@ fn bench_cell_line_operations(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("clone_line", size), size, |b, &size| {
             let line: Vec<Cell> = (0..size).map(|_| Cell::blank()).collect();
-            b.iter(|| {
-                black_box(line.clone())
-            });
+            b.iter(|| black_box(line.clone()));
         });
 
-        group.bench_with_input(BenchmarkId::new("compare_identical_lines", size), size, |b, &size| {
-            let line1: Vec<Cell> = (0..size).map(|i| Cell::new((b'A' + (i % 26) as u8) as char)).collect();
-            let line2 = line1.clone();
-            b.iter(|| {
-                black_box(line1 == line2)
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("compare_identical_lines", size),
+            size,
+            |b, &size| {
+                let line1: Vec<Cell> = (0..size)
+                    .map(|i| Cell::new((b'A' + (i % 26) as u8) as char))
+                    .collect();
+                let line2 = line1.clone();
+                b.iter(|| black_box(line1 == line2));
+            },
+        );
 
-        group.bench_with_input(BenchmarkId::new("compare_different_lines", size), size, |b, &size| {
-            let line1: Vec<Cell> = (0..size).map(|i| Cell::new((b'A' + (i % 26) as u8) as char)).collect();
-            let mut line2 = line1.clone();
-            line2[size / 2] = Cell::new('X');
-            b.iter(|| {
-                black_box(line1 == line2)
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("compare_different_lines", size),
+            size,
+            |b, &size| {
+                let line1: Vec<Cell> = (0..size)
+                    .map(|i| Cell::new((b'A' + (i % 26) as u8) as char))
+                    .collect();
+                let mut line2 = line1.clone();
+                line2[size / 2] = Cell::new('X');
+                b.iter(|| black_box(line1 == line2));
+            },
+        );
     }
 
     group.finish();
@@ -109,12 +98,18 @@ fn bench_cell_memory_size(c: &mut Criterion) {
         b.iter(|| {
             // Measure memory impact by creating many cells
             let cells: Vec<Cell> = (0..10000)
-                .map(|i| Cell::with_style(
-                    (b'A' + (i % 26) as u8) as char,
-                    if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
-                    if i % 3 == 0 { Color::Red } else { Color::Reset },
-                    if i % 5 == 0 { Color::Blue } else { Color::Reset },
-                ))
+                .map(|i| {
+                    Cell::with_style(
+                        (b'A' + (i % 26) as u8) as char,
+                        if i % 2 == 0 { Attr::BOLD } else { Attr::NORMAL },
+                        if i % 3 == 0 { Color::Red } else { Color::Reset },
+                        if i % 5 == 0 {
+                            Color::Blue
+                        } else {
+                            Color::Reset
+                        },
+                    )
+                })
                 .collect();
             black_box(cells)
         });

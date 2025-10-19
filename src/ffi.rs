@@ -277,12 +277,7 @@ pub extern "C" fn zaz_print(screen: *mut ZazScreen, text: *const c_char) -> i32 
 
 /// Print string at position (y, x)
 #[unsafe(no_mangle)]
-pub extern "C" fn zaz_mvprint(
-    screen: *mut ZazScreen,
-    y: u16,
-    x: u16,
-    text: *const c_char,
-) -> i32 {
+pub extern "C" fn zaz_mvprint(screen: *mut ZazScreen, y: u16, x: u16, text: *const c_char) -> i32 {
     if screen.is_null() || text.is_null() {
         return -1;
     }

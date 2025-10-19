@@ -85,7 +85,7 @@ impl Screen {
             #[cfg(unix)]
             stdin_fd: 0, // Standard input file descriptor
             check_interval: 5, // Check for input every 5 lines (default)
-            fifo_hold: false, // Allow input checking by default
+            fifo_hold: false,  // Allow input checking by default
         })
     }
 
@@ -410,7 +410,7 @@ impl Screen {
     /// Returns true if stdin has data available to read
     #[cfg(unix)]
     fn check_pending_input(&self) -> Result<bool> {
-        use libc::{poll, pollfd, POLLIN};
+        use libc::{POLLIN, poll, pollfd};
 
         if self.fifo_hold {
             return Ok(false);
@@ -457,7 +457,8 @@ impl Screen {
         }
 
         // Detect scroll operations using hash matching
-        let scrolls = crate::delta::detect_scrolls(&self.current_line_hashes, &self.pending_line_hashes);
+        let scrolls =
+            crate::delta::detect_scrolls(&self.current_line_hashes, &self.pending_line_hashes);
 
         // Execute scroll operations (using ANSI delete/insert line sequences)
         for scroll in &scrolls {
@@ -564,7 +565,8 @@ impl Screen {
                                 }
                                 color_buf.clear();
                                 fg.write_ansi_fg(&mut color_buf);
-                                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+                                self.style_sequence_buf
+                                    .extend_from_slice(color_buf.as_bytes());
                                 needs_separator = true;
 
                                 let bg = cell_style.2;
@@ -573,13 +575,14 @@ impl Screen {
                                 }
                                 color_buf.clear();
                                 bg.write_ansi_bg(&mut color_buf);
-                                self.style_sequence_buf.extend_from_slice(color_buf.as_bytes());
+                                self.style_sequence_buf
+                                    .extend_from_slice(color_buf.as_bytes());
 
                                 // Emit ANSI sequence if we added any codes
                                 if !self.style_sequence_buf.is_empty() {
                                     self.buffer.push_str("\x1b[");
                                     self.buffer.push_str(
-                                        std::str::from_utf8(&self.style_sequence_buf).unwrap()
+                                        std::str::from_utf8(&self.style_sequence_buf).unwrap(),
                                     );
                                     self.buffer.push('m');
                                 }
@@ -644,7 +647,8 @@ impl Screen {
             for y in 0..self.rows as usize {
                 self.pending_content[y].clone_from_slice(&self.current_content[y]);
             }
-            self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
+            self.pending_line_hashes
+                .copy_from_slice(&self.current_line_hashes);
         }
 
         Ok(())
@@ -733,7 +737,6 @@ impl Screen {
         }
         Window::new(height, width, y, x)
     }
-
 }
 
 #[cfg(test)]
@@ -1030,7 +1033,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1068,7 +1071,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1100,7 +1103,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1140,7 +1143,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1175,7 +1178,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1210,7 +1213,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1245,7 +1248,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1280,7 +1283,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1315,7 +1318,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,
@@ -1350,7 +1353,7 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
+            current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
             #[cfg(unix)]
             stdin_fd: 0,

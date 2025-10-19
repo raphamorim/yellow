@@ -2,7 +2,6 @@
 ///
 /// This module provides optimized, direct I/O operations that bypass
 /// standard library buffering for maximum performance.
-
 use std::io;
 
 #[cfg(unix)]
@@ -17,9 +16,7 @@ fn get_output_fd() -> RawFd {
     *DEVNULL.get_or_init(|| {
         use std::ffi::CString;
         let path = CString::new("/dev/null").unwrap();
-        unsafe {
-            libc::open(path.as_ptr(), libc::O_WRONLY)
-        }
+        unsafe { libc::open(path.as_ptr(), libc::O_WRONLY) }
     })
 }
 

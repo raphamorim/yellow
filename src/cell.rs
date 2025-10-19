@@ -2,7 +2,6 @@
 ///
 /// This version uses Option<Color> directly to preserve full RGB precision,
 /// avoiding color quantization artifacts in gradients.
-
 use crate::attr::Attr;
 use crate::color::Color;
 
@@ -46,12 +45,7 @@ impl Cell {
 
     /// Create a cell with a character and specific styling
     pub fn with_style(ch: char, attr: Attr, fg: Color, bg: Color) -> Self {
-        Self {
-            ch,
-            attr,
-            fg,
-            bg,
-        }
+        Self { ch, attr, fg, bg }
     }
 
     /// Get the character
@@ -102,9 +96,7 @@ impl Cell {
 
     /// Check if this cell has the same styling as another (ignoring character)
     pub fn same_style(&self, other: &Cell) -> bool {
-        self.attr == other.attr
-            && self.fg == other.fg
-            && self.bg == other.bg
+        self.attr == other.attr && self.fg == other.fg && self.bg == other.bg
     }
 }
 
@@ -124,7 +116,10 @@ mod tests {
 
         // Color enum: Cell should be 16 bytes (char=4, Attr=2, padding=2, fg=4, bg=4)
         assert_eq!(size, 16, "Cell should be exactly 16 bytes");
-        assert!(size < 24, "Cell should be significantly smaller than original ~32 bytes");
+        assert!(
+            size < 24,
+            "Cell should be significantly smaller than original ~32 bytes"
+        );
     }
 
     #[test]
@@ -206,12 +201,7 @@ mod tests {
 
     #[test]
     fn test_cell_clone() {
-        let cell1 = Cell::with_style(
-            'X',
-            Attr::BOLD | Attr::UNDERLINE,
-            Color::Green,
-            Color::Blue,
-        );
+        let cell1 = Cell::with_style('X', Attr::BOLD | Attr::UNDERLINE, Color::Green, Color::Blue);
         let cell2 = cell1.clone();
 
         assert_eq!(cell1, cell2);
@@ -298,6 +288,9 @@ mod tests {
         // Verify it's significantly smaller than original
         // Original was ~32 bytes, so 80 cells = 2560 bytes
         // New should be 16 bytes, so 80 cells = 1280 bytes
-        assert_eq!(size, 1280, "80 cells should use exactly 1280 bytes (16 bytes per cell)");
+        assert_eq!(
+            size, 1280,
+            "80 cells should use exactly 1280 bytes (16 bytes per cell)"
+        );
     }
 }
