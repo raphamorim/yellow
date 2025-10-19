@@ -1,4 +1,5 @@
 use crate::cell::Cell;
+use crate::Color;
 
 /// Represents a dirty region within a line
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,26 +141,53 @@ pub fn hash_line(cells: &[Cell]) -> u64 {
             hash = hash.wrapping_mul(FNV_PRIME);
         }
 
-        // Hash packed colors directly (2 bytes each) - avoid unpacking
-        // Access internal representation directly for speed
-        let fg_packed = unsafe {
-            std::mem::transmute::<_, u16>(cell.fg_packed)
-        };
-        let bg_packed = unsafe {
-            std::mem::transmute::<_, u16>(cell.bg_packed)
-        };
+        // Hash colors safely by hashing their discriminant and data
+        fn hash_color(hash: &mut u64, color: Option<Color>) {
+            const FNV_PRIME: u64 = 0x100000001b3;
 
-        let fg_bytes = fg_packed.to_ne_bytes();
-        for &byte in &fg_bytes {
-            hash ^= byte as u64;
-            hash = hash.wrapping_mul(FNV_PRIME);
+            match color {
+                None => {
+                    *hash ^= 0;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                }
+                Some(Color::Black) => { *hash ^= 1; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Red) => { *hash ^= 2; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Green) => { *hash ^= 3; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Yellow) => { *hash ^= 4; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Blue) => { *hash ^= 5; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Magenta) => { *hash ^= 6; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Cyan) => { *hash ^= 7; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::White) => { *hash ^= 8; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightBlack) => { *hash ^= 9; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightRed) => { *hash ^= 10; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightGreen) => { *hash ^= 11; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightYellow) => { *hash ^= 12; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightBlue) => { *hash ^= 13; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightMagenta) => { *hash ^= 14; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightCyan) => { *hash ^= 15; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::BrightWhite) => { *hash ^= 16; *hash = hash.wrapping_mul(FNV_PRIME); }
+                Some(Color::Ansi256(c)) => {
+                    *hash ^= 17;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                    *hash ^= c as u64;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                }
+                Some(Color::Rgb(r, g, b)) => {
+                    *hash ^= 18;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                    *hash ^= r as u64;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                    *hash ^= g as u64;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                    *hash ^= b as u64;
+                    *hash = hash.wrapping_mul(FNV_PRIME);
+                }
+                Some(Color::Reset) => { *hash ^= 19; *hash = hash.wrapping_mul(FNV_PRIME); }
+            }
         }
 
-        let bg_bytes = bg_packed.to_ne_bytes();
-        for &byte in &bg_bytes {
-            hash ^= byte as u64;
-            hash = hash.wrapping_mul(FNV_PRIME);
-        }
+        hash_color(&mut hash, cell.fg());
+        hash_color(&mut hash, cell.bg());
     }
 
     hash

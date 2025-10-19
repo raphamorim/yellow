@@ -1,33 +1,29 @@
-/// Optimized Cell implementation using packed colors
+/// Cell implementation with full-precision colors
 ///
-/// This version reduces memory usage from ~32 bytes to 12 bytes per cell
-/// while maintaining full API compatibility.
+/// This version uses Option<Color> directly to preserve full RGB precision,
+/// avoiding color quantization artifacts in gradients.
 
 use crate::attr::Attr;
 use crate::color::Color;
-use crate::packed_color::PackedColor;
 
 /// A single cell in the screen buffer, containing a character and its styling
 ///
-/// Memory layout (12 bytes total):
+/// Memory layout (~16 bytes total):
 /// - ch: char (4 bytes)
 /// - attr: u16 (2 bytes)
 /// - padding: 2 bytes (for alignment)
-/// - fg: PackedColor (4 bytes)
-/// - bg: PackedColor (4 bytes) - actually 2 bytes each but aligned to 4
-///
-/// Note: Due to alignment, we get 12 bytes instead of the theoretical 10 bytes,
-/// but this is still a 62% reduction from the original ~32 bytes.
+/// - fg: Option<Color> (4 bytes)
+/// - bg: Option<Color> (4 bytes)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cell {
     /// The character to display
     pub ch: char,
     /// Text attributes (bold, underline, etc.)
     pub attr: Attr,
-    /// Foreground color (packed) - use fg() method to access
-    pub(crate) fg_packed: PackedColor,
-    /// Background color (packed) - use bg() method to access
-    pub(crate) bg_packed: PackedColor,
+    /// Foreground color
+    fg: Option<Color>,
+    /// Background color
+    bg: Option<Color>,
 }
 
 impl Cell {
@@ -36,8 +32,8 @@ impl Cell {
         Self {
             ch,
             attr: Attr::NORMAL,
-            fg_packed: PackedColor::none(),
-            bg_packed: PackedColor::none(),
+            fg: None,
+            bg: None,
         }
     }
 
@@ -51,8 +47,8 @@ impl Cell {
         Self {
             ch,
             attr,
-            fg_packed: PackedColor::from_color(fg),
-            bg_packed: PackedColor::from_color(bg),
+            fg,
+            bg,
         }
     }
 
@@ -71,28 +67,28 @@ impl Cell {
     /// Get the foreground color
     #[inline]
     pub fn fg(&self) -> Option<Color> {
-        self.fg_packed.to_color()
+        self.fg
     }
 
     /// Get the background color
     #[inline]
     pub fn bg(&self) -> Option<Color> {
-        self.bg_packed.to_color()
+        self.bg
     }
 
     /// Check if this cell is a blank (space with no styling)
     pub fn is_blank(&self) -> bool {
         self.ch == ' '
             && self.attr == Attr::NORMAL
-            && !self.fg_packed.has_color()
-            && !self.bg_packed.has_color()
+            && self.fg.is_none()
+            && self.bg.is_none()
     }
 
     /// Check if this cell has the same styling as another (ignoring character)
     pub fn same_style(&self, other: &Cell) -> bool {
         self.attr == other.attr
-            && self.fg_packed == other.fg_packed
-            && self.bg_packed == other.bg_packed
+            && self.fg == other.fg
+            && self.bg == other.bg
     }
 }
 
@@ -110,10 +106,9 @@ mod tests {
     fn test_cell_size() {
         let size = std::mem::size_of::<Cell>();
 
-        // Phase 1.1 optimization: Cell should be 12 bytes (char=4, Attr=2, fg=2, bg=2)
-        // With alignment, we accept up to 16 bytes
-        assert_eq!(size, 12, "Cell should be exactly 12 bytes for optimal cache usage");
-        assert!(size < 20, "Cell should be significantly smaller than original ~32 bytes");
+        // Full-precision colors: Cell should be 16 bytes (char=4, Attr=2, padding=2, fg=4, bg=4)
+        assert_eq!(size, 16, "Cell should be exactly 16 bytes for full-precision colors");
+        assert!(size < 24, "Cell should be significantly smaller than original ~32 bytes");
     }
 
     #[test]
@@ -285,7 +280,7 @@ mod tests {
 
         // Verify it's significantly smaller than original
         // Original was ~32 bytes, so 80 cells = 2560 bytes
-        // New should be 12 bytes, so 80 cells = 960 bytes
-        assert_eq!(size, 960, "80 cells should use exactly 960 bytes (12 bytes per cell)");
+        // New should be 16 bytes, so 80 cells = 1280 bytes
+        assert_eq!(size, 1280, "80 cells should use exactly 1280 bytes (16 bytes per cell)");
     }
 }
