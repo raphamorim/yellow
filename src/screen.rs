@@ -18,12 +18,21 @@ pub struct Screen {
     color_pairs: HashMap<u8, ColorPair>,
     cursor_visible: bool,
     buffer: String,
+    // Performance optimization: track last emitted style to avoid redundant codes
+    last_emitted_attr: Attr,
+    last_emitted_fg: Option<Color>,
+    last_emitted_bg: Option<Color>,
 }
 
 impl Screen {
     /// Initialize the screen
     pub fn init() -> Result<Self> {
         Backend::init()?;
+
+        // Performance optimization: pre-allocate buffer based on terminal size
+        // Estimate: ~10 bytes per cell (ANSI codes + character)
+        let (rows, cols) = Backend::get_terminal_size().unwrap_or((24, 80));
+        let estimated_capacity = (rows as usize * cols as usize * 10).min(65536); // Cap at 64KB
 
         Ok(Self {
             cursor_x: 0,
@@ -33,7 +42,10 @@ impl Screen {
             current_bg: None,
             color_pairs: HashMap::new(),
             cursor_visible: false,
-            buffer: String::new(),
+            buffer: String::with_capacity(estimated_capacity),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         })
     }
 
@@ -49,9 +61,33 @@ impl Screen {
 
     /// Move cursor to position (y, x)
     pub fn move_cursor(&mut self, y: u16, x: u16) -> Result<()> {
+        // Performance optimization: use relative cursor movement for short distances
+        let dy = (y as i32 - self.cursor_y as i32).abs();
+        let dx = (x as i32 - self.cursor_x as i32).abs();
+
+        // Threshold: use relative movement if distance < 4 cells
+        // (relative sequences are shorter for small distances)
+        if dy == 0 && dx > 0 && dx < 4 {
+            // Horizontal movement only
+            if x > self.cursor_x {
+                write!(self.buffer, "\x1b[{}C", dx)?; // CUF - Cursor Forward
+            } else {
+                write!(self.buffer, "\x1b[{}D", dx)?; // CUB - Cursor Back
+            }
+        } else if dx == 0 && dy > 0 && dy < 4 {
+            // Vertical movement only
+            if y > self.cursor_y {
+                write!(self.buffer, "\x1b[{}B", dy)?; // CUD - Cursor Down
+            } else {
+                write!(self.buffer, "\x1b[{}A", dy)?; // CUU - Cursor Up
+            }
+        } else {
+            // Use absolute positioning for long distances or diagonal movement
+            write!(self.buffer, "\x1b[{};{}H", y + 1, x + 1)?; // CUP - Cursor Position
+        }
+
         self.cursor_y = y;
         self.cursor_x = x;
-        write!(self.buffer, "\x1b[{};{}H", y + 1, x + 1)?;
         Ok(())
     }
 
@@ -318,24 +354,46 @@ impl Screen {
     }
 
     fn apply_style(&mut self) -> Result<()> {
+        // Performance optimization: only emit ANSI codes if style changed since last emission
+        let style_changed = self.current_attr != self.last_emitted_attr
+            || self.current_fg != self.last_emitted_fg
+            || self.current_bg != self.last_emitted_bg;
+
+        if !style_changed {
+            return Ok(());
+        }
+
         let mut codes: Vec<String> = Vec::new();
 
-        // Add attribute codes
-        if !self.current_attr.is_empty() {
-            codes.extend(
-                self.current_attr
-                    .to_ansi_codes()
-                    .iter()
-                    .map(|s| s.to_string()),
-            );
+        // If any attribute changed, we need to reset and re-apply all
+        // (ANSI doesn't support selective attribute removal)
+        if self.current_attr != self.last_emitted_attr {
+            // Reset all attributes first
+            if self.last_emitted_attr != Attr::NORMAL {
+                codes.push("0".to_string());
+            }
+
+            // Add current attribute codes
+            if !self.current_attr.is_empty() {
+                codes.extend(
+                    self.current_attr
+                        .to_ansi_codes()
+                        .iter()
+                        .map(|s| s.to_string()),
+                );
+            }
         }
 
-        // Add color codes
-        if let Some(fg) = &self.current_fg {
-            codes.push(fg.to_ansi_fg());
+        // Add color codes if changed
+        if self.current_fg != self.last_emitted_fg {
+            if let Some(fg) = &self.current_fg {
+                codes.push(fg.to_ansi_fg());
+            }
         }
-        if let Some(bg) = &self.current_bg {
-            codes.push(bg.to_ansi_bg());
+        if self.current_bg != self.last_emitted_bg {
+            if let Some(bg) = &self.current_bg {
+                codes.push(bg.to_ansi_bg());
+            }
         }
 
         if !codes.is_empty() {
@@ -343,6 +401,11 @@ impl Screen {
                 Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
             })?;
         }
+
+        // Update last emitted state
+        self.last_emitted_attr = self.current_attr;
+        self.last_emitted_fg = self.current_fg;
+        self.last_emitted_bg = self.current_bg;
 
         Ok(())
     }
@@ -364,6 +427,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.move_cursor(5, 10).unwrap();
@@ -388,6 +454,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.attron(Attr::BOLD).unwrap();
@@ -412,6 +481,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.init_pair(1, Color::Red, Color::Black).unwrap();
@@ -432,6 +504,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         let result = scr.color_pair(99);
@@ -449,6 +524,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.clear().unwrap();
@@ -476,6 +554,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.cursor_visible(true).unwrap();
@@ -497,6 +578,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         use crate::kitty::KittyFlags;
@@ -523,6 +607,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         scr.disable_kitty_keyboard().unwrap();
@@ -540,6 +627,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         use crate::kitty::KittyFlags;
@@ -566,6 +656,9 @@ mod tests {
             color_pairs: HashMap::new(),
             cursor_visible: false,
             buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         };
 
         use crate::kitty::KittyFlags;
@@ -580,5 +673,392 @@ mod tests {
         scr.enable_kitty_keyboard(all_flags).unwrap();
         // 1+2+4+8+16 = 31
         assert!(scr.buffer.contains("\x1b[>31u"));
+    }
+
+    #[test]
+    fn test_style_caching_no_redundant_codes() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // First print should emit style codes
+        scr.print("Hello").unwrap();
+        scr.buffer.clear();
+
+        // Second print with same style should NOT emit style codes again
+        scr.print("World").unwrap();
+        let second_output = scr.buffer.clone();
+
+        // Second output should not contain any ANSI escape sequences
+        assert!(!second_output.contains("\x1b["));
+        assert_eq!(second_output, "World");
+    }
+
+    #[test]
+    fn test_style_caching_emits_on_change() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Print without style
+        scr.print("Normal").unwrap();
+        scr.buffer.clear();
+
+        // Change to bold
+        scr.attron(Attr::BOLD).unwrap();
+        scr.print("Bold").unwrap();
+
+        // Should contain bold code (1)
+        assert!(scr.buffer.contains("\x1b[1m"));
+    }
+
+    #[test]
+    fn test_style_caching_color_change() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Set foreground color
+        scr.set_fg(Color::Red).unwrap();
+        scr.print("Red").unwrap();
+        scr.buffer.clear();
+
+        // Print with same color - no new codes
+        scr.print("AlsoRed").unwrap();
+        assert!(!scr.buffer.contains("\x1b["));
+
+        // Change color
+        scr.buffer.clear();
+        scr.set_fg(Color::Blue).unwrap();
+        scr.print("Blue").unwrap();
+
+        // Should contain new color code
+        assert!(scr.buffer.contains("\x1b["));
+    }
+
+    #[test]
+    fn test_style_caching_attr_reset() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Turn on bold
+        scr.attron(Attr::BOLD).unwrap();
+        scr.print("Bold").unwrap();
+        scr.buffer.clear();
+
+        // Turn off bold (back to NORMAL)
+        scr.attroff(Attr::BOLD).unwrap();
+        scr.print("Normal").unwrap();
+
+        // Should contain reset code (0)
+        assert!(scr.buffer.contains("\x1b[0m"));
+    }
+
+    #[test]
+    fn test_style_caching_multiple_attrs() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Turn on bold and underline
+        scr.attron(Attr::BOLD | Attr::UNDERLINE).unwrap();
+        scr.print("Styled").unwrap();
+        scr.buffer.clear();
+
+        // Print again with same attrs - no codes
+        scr.print("AlsoStyled").unwrap();
+        assert!(!scr.buffer.contains("\x1b["));
+        assert_eq!(scr.buffer, "AlsoStyled");
+    }
+
+    #[test]
+    fn test_buffer_preallocation() {
+        // Create a screen with pre-allocated buffer
+        let scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: {
+                let (rows, cols) = (24, 80);
+                let estimated_capacity = (rows * cols * 10).min(65536);
+                String::with_capacity(estimated_capacity)
+            },
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Verify buffer has non-zero capacity
+        assert!(scr.buffer.capacity() > 0);
+        assert!(scr.buffer.capacity() >= 24 * 80 * 10);
+    }
+
+    #[test]
+    fn test_buffer_capacity_capped() {
+        // Test that very large terminal sizes don't result in excessive allocation
+        let scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: {
+                let (rows, cols) = (1000, 1000); // Very large terminal
+                let estimated_capacity = (rows * cols * 10).min(65536);
+                String::with_capacity(estimated_capacity)
+            },
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Verify capacity is capped at 64KB
+        assert_eq!(scr.buffer.capacity(), 65536);
+    }
+
+    #[test]
+    fn test_buffer_no_reallocation_on_typical_use() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::with_capacity(1000),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        let initial_capacity = scr.buffer.capacity();
+
+        // Perform typical operations
+        for i in 0..10 {
+            scr.move_cursor(i, 0).unwrap();
+            scr.print("Test line").unwrap();
+        }
+
+        // Buffer should not have reallocated
+        assert_eq!(scr.buffer.capacity(), initial_capacity);
+    }
+
+    #[test]
+    fn test_cursor_movement_short_horizontal_forward() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move forward 2 cells (should use CUF)
+        scr.move_cursor(5, 12).unwrap();
+        assert!(scr.buffer.contains("\x1b[2C")); // Cursor Forward 2
+        assert_eq!(scr.cursor_x, 12);
+        assert_eq!(scr.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_cursor_movement_short_horizontal_back() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move back 3 cells (should use CUB)
+        scr.move_cursor(5, 7).unwrap();
+        assert!(scr.buffer.contains("\x1b[3D")); // Cursor Back 3
+        assert_eq!(scr.cursor_x, 7);
+        assert_eq!(scr.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_cursor_movement_short_vertical_down() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move down 2 lines (should use CUD)
+        scr.move_cursor(7, 10).unwrap();
+        assert!(scr.buffer.contains("\x1b[2B")); // Cursor Down 2
+        assert_eq!(scr.cursor_x, 10);
+        assert_eq!(scr.cursor_y, 7);
+    }
+
+    #[test]
+    fn test_cursor_movement_short_vertical_up() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move up 1 line (should use CUU)
+        scr.move_cursor(4, 10).unwrap();
+        assert!(scr.buffer.contains("\x1b[1A")); // Cursor Up 1
+        assert_eq!(scr.cursor_x, 10);
+        assert_eq!(scr.cursor_y, 4);
+    }
+
+    #[test]
+    fn test_cursor_movement_long_distance_uses_absolute() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move 10 cells forward (should use CUP for long distance)
+        scr.move_cursor(5, 20).unwrap();
+        assert!(scr.buffer.contains("\x1b[6;21H")); // CUP (note: +1 for 1-based indexing)
+        assert_eq!(scr.cursor_x, 20);
+        assert_eq!(scr.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_cursor_movement_diagonal_uses_absolute() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Diagonal movement (should use CUP)
+        scr.move_cursor(7, 12).unwrap();
+        assert!(scr.buffer.contains("\x1b[8;13H")); // CUP
+        assert_eq!(scr.cursor_x, 12);
+        assert_eq!(scr.cursor_y, 7);
+    }
+
+    #[test]
+    fn test_cursor_movement_same_position() {
+        let mut scr = Screen {
+            cursor_x: 10,
+            cursor_y: 5,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+        };
+
+        // Move to same position (should use CUP due to dx=0, dy=0)
+        scr.move_cursor(5, 10).unwrap();
+        assert!(scr.buffer.contains("\x1b[6;11H"));
+        assert_eq!(scr.cursor_x, 10);
+        assert_eq!(scr.cursor_y, 5);
     }
 }

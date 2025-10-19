@@ -17,10 +17,18 @@ pub struct Window {
     current_bg: Option<Color>,
     buffer: String,
     scroll_enabled: bool,
+    // Performance optimization: track last emitted style to avoid redundant codes
+    last_emitted_attr: Attr,
+    last_emitted_fg: Option<Color>,
+    last_emitted_bg: Option<Color>,
 }
 
 impl Window {
     pub(crate) fn new(height: u16, width: u16, y: u16, x: u16) -> Result<Self> {
+        // Performance optimization: pre-allocate buffer based on window size
+        // Estimate: ~10 bytes per cell (ANSI codes + character)
+        let estimated_capacity = (height as usize * width as usize * 10).min(65536); // Cap at 64KB
+
         Ok(Self {
             height,
             width,
@@ -31,8 +39,11 @@ impl Window {
             current_attr: Attr::NORMAL,
             current_fg: None,
             current_bg: None,
-            buffer: String::new(),
+            buffer: String::with_capacity(estimated_capacity),
             scroll_enabled: false,
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
         })
     }
 
@@ -52,12 +63,35 @@ impl Window {
             return Err(Error::InvalidCoordinates { y, x });
         }
 
-        self.cursor_y = y;
-        self.cursor_x = x;
+        // Performance optimization: use relative cursor movement for short distances
+        let dy = (y as i32 - self.cursor_y as i32).abs();
+        let dx = (x as i32 - self.cursor_x as i32).abs();
 
         let abs_y = self.begin_y + y;
         let abs_x = self.begin_x + x;
-        write!(self.buffer, "\x1b[{};{}H", abs_y + 1, abs_x + 1)?;
+
+        // Threshold: use relative movement if distance < 4 cells
+        if dy == 0 && dx > 0 && dx < 4 {
+            // Horizontal movement only
+            if x > self.cursor_x {
+                write!(self.buffer, "\x1b[{}C", dx)?; // CUF - Cursor Forward
+            } else {
+                write!(self.buffer, "\x1b[{}D", dx)?; // CUB - Cursor Back
+            }
+        } else if dx == 0 && dy > 0 && dy < 4 {
+            // Vertical movement only
+            if y > self.cursor_y {
+                write!(self.buffer, "\x1b[{}B", dy)?; // CUD - Cursor Down
+            } else {
+                write!(self.buffer, "\x1b[{}A", dy)?; // CUU - Cursor Up
+            }
+        } else {
+            // Use absolute positioning for long distances or diagonal movement
+            write!(self.buffer, "\x1b[{};{}H", abs_y + 1, abs_x + 1)?; // CUP - Cursor Position
+        }
+
+        self.cursor_y = y;
+        self.cursor_x = x;
         Ok(())
     }
 
@@ -245,22 +279,46 @@ impl Window {
     }
 
     fn apply_style(&mut self) -> Result<()> {
+        // Performance optimization: only emit ANSI codes if style changed since last emission
+        let style_changed = self.current_attr != self.last_emitted_attr
+            || self.current_fg != self.last_emitted_fg
+            || self.current_bg != self.last_emitted_bg;
+
+        if !style_changed {
+            return Ok(());
+        }
+
         let mut codes: Vec<String> = Vec::new();
 
-        if !self.current_attr.is_empty() {
-            codes.extend(
-                self.current_attr
-                    .to_ansi_codes()
-                    .iter()
-                    .map(|s| s.to_string()),
-            );
+        // If any attribute changed, we need to reset and re-apply all
+        // (ANSI doesn't support selective attribute removal)
+        if self.current_attr != self.last_emitted_attr {
+            // Reset all attributes first
+            if self.last_emitted_attr != Attr::NORMAL {
+                codes.push("0".to_string());
+            }
+
+            // Add current attribute codes
+            if !self.current_attr.is_empty() {
+                codes.extend(
+                    self.current_attr
+                        .to_ansi_codes()
+                        .iter()
+                        .map(|s| s.to_string()),
+                );
+            }
         }
 
-        if let Some(fg) = &self.current_fg {
-            codes.push(fg.to_ansi_fg());
+        // Add color codes if changed
+        if self.current_fg != self.last_emitted_fg {
+            if let Some(fg) = &self.current_fg {
+                codes.push(fg.to_ansi_fg());
+            }
         }
-        if let Some(bg) = &self.current_bg {
-            codes.push(bg.to_ansi_bg());
+        if self.current_bg != self.last_emitted_bg {
+            if let Some(bg) = &self.current_bg {
+                codes.push(bg.to_ansi_bg());
+            }
         }
 
         if !codes.is_empty() {
@@ -268,6 +326,11 @@ impl Window {
                 Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
             })?;
         }
+
+        // Update last emitted state
+        self.last_emitted_attr = self.current_attr;
+        self.last_emitted_fg = self.current_fg;
+        self.last_emitted_bg = self.current_bg;
 
         Ok(())
     }
@@ -446,5 +509,180 @@ mod tests {
         win.scroll(-4).unwrap();
 
         assert!(!win.buffer.is_empty());
+    }
+
+    #[test]
+    fn test_window_style_caching_no_redundant_codes() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // First print should emit style codes
+        win.print("Hello").unwrap();
+        win.buffer.clear();
+
+        // Second print with same style should NOT emit style codes again
+        win.print("World").unwrap();
+        let second_output = win.buffer.clone();
+
+        // Second output should not contain any ANSI escape sequences
+        assert!(!second_output.contains("\x1b["));
+        assert_eq!(second_output, "World");
+    }
+
+    #[test]
+    fn test_window_style_caching_emits_on_change() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Print without style
+        win.print("Normal").unwrap();
+        win.buffer.clear();
+
+        // Change to bold
+        win.attron(Attr::BOLD).unwrap();
+        win.print("Bold").unwrap();
+
+        // Should contain bold code (1)
+        assert!(win.buffer.contains("\x1b[1m"));
+    }
+
+    #[test]
+    fn test_window_style_caching_color_change() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Set foreground color
+        win.set_fg(Color::Red).unwrap();
+        win.print("Red").unwrap();
+        win.buffer.clear();
+
+        // Print with same color - no new codes
+        win.print("AlsoRed").unwrap();
+        assert!(!win.buffer.contains("\x1b["));
+
+        // Change color
+        win.buffer.clear();
+        win.set_fg(Color::Blue).unwrap();
+        win.print("Blue").unwrap();
+
+        // Should contain new color code
+        assert!(win.buffer.contains("\x1b["));
+    }
+
+    #[test]
+    fn test_window_style_caching_attr_reset() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Turn on bold
+        win.attron(Attr::BOLD).unwrap();
+        win.print("Bold").unwrap();
+        win.buffer.clear();
+
+        // Turn off bold (back to NORMAL)
+        win.attroff(Attr::BOLD).unwrap();
+        win.print("Normal").unwrap();
+
+        // Should contain reset code (0)
+        assert!(win.buffer.contains("\x1b[0m"));
+    }
+
+    #[test]
+    fn test_window_style_caching_multiple_attrs() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Turn on bold and underline
+        win.attron(Attr::BOLD | Attr::UNDERLINE).unwrap();
+        win.print("Styled").unwrap();
+        win.buffer.clear();
+
+        // Print again with same attrs - no codes
+        win.print("AlsoStyled").unwrap();
+        assert!(!win.buffer.contains("\x1b["));
+        assert_eq!(win.buffer, "AlsoStyled");
+    }
+
+    #[test]
+    fn test_window_buffer_preallocation() {
+        // Create a window
+        let win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Verify buffer has non-zero capacity
+        assert!(win.buffer.capacity() > 0);
+        // Should be at least 10 * 20 * 10 = 2000 bytes
+        assert!(win.buffer.capacity() >= 2000);
+    }
+
+    #[test]
+    fn test_window_buffer_capacity_capped() {
+        // Create a very large window
+        let win = Window::new(1000, 1000, 0, 0).unwrap();
+
+        // Verify capacity is capped at 64KB even for large windows
+        assert_eq!(win.buffer.capacity(), 65536);
+    }
+
+    #[test]
+    fn test_window_buffer_no_reallocation_on_typical_use() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+        let initial_capacity = win.buffer.capacity();
+
+        // Perform typical operations
+        for i in 0..5 {
+            win.mvprint(i, 0, "Test line").unwrap();
+        }
+
+        // Buffer should not have reallocated
+        assert_eq!(win.buffer.capacity(), initial_capacity);
+    }
+
+    #[test]
+    fn test_window_cursor_movement_short_horizontal() {
+        let mut win = Window::new(10, 20, 5, 5).unwrap();
+        win.cursor_x = 5;
+        win.cursor_y = 3;
+
+        // Move forward 2 cells (should use CUF)
+        win.move_cursor(3, 7).unwrap();
+        assert!(win.buffer.contains("\x1b[2C")); // Cursor Forward 2
+        assert_eq!(win.cursor_x, 7);
+        assert_eq!(win.cursor_y, 3);
+    }
+
+    #[test]
+    fn test_window_cursor_movement_short_vertical() {
+        let mut win = Window::new(10, 20, 5, 5).unwrap();
+        win.cursor_x = 5;
+        win.cursor_y = 3;
+
+        // Move down 2 lines (should use CUD)
+        win.move_cursor(5, 5).unwrap();
+        assert!(win.buffer.contains("\x1b[2B")); // Cursor Down 2
+        assert_eq!(win.cursor_x, 5);
+        assert_eq!(win.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_window_cursor_movement_long_distance() {
+        let mut win = Window::new(10, 20, 5, 5).unwrap();
+        win.cursor_x = 2;
+        win.cursor_y = 1;
+
+        // Move 10 cells forward (should use CUP)
+        win.move_cursor(1, 12).unwrap();
+        // abs_y = 5 + 1 = 6, abs_x = 5 + 12 = 17
+        // In 1-based: row 7, col 18
+        assert!(win.buffer.contains("\x1b[7;18H")); // CUP
+        assert_eq!(win.cursor_x, 12);
+        assert_eq!(win.cursor_y, 1);
+    }
+
+    #[test]
+    fn test_window_cursor_movement_diagonal() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+        win.cursor_x = 5;
+        win.cursor_y = 3;
+
+        // Diagonal movement (should use CUP)
+        win.move_cursor(5, 8).unwrap();
+        assert!(win.buffer.contains("\x1b[6;9H")); // CUP
+        assert_eq!(win.cursor_x, 8);
+        assert_eq!(win.cursor_y, 5);
     }
 }
