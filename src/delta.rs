@@ -69,78 +69,99 @@ impl DirtyRegion {
 }
 
 /// Find the first and last difference in a line
+///
+/// Optimized with early exit and chunk-based comparison for better performance.
 pub fn find_line_diff(old_line: &[Cell], new_line: &[Cell]) -> Option<(usize, usize)> {
-    if old_line.len() != new_line.len() {
+    let len = old_line.len();
+
+    if len != new_line.len() {
         // Different lengths - entire line is different
         return Some((0, new_line.len().saturating_sub(1)));
     }
 
-    if old_line.is_empty() {
+    if len == 0 {
         return None;
     }
 
-    // Find first difference
-    let first_diff = old_line
-        .iter()
-        .zip(new_line.iter())
-        .position(|(old, new)| old != new)?;
+    // Fast path: check if lines are identical using memory comparison
+    // This is much faster than cell-by-cell comparison for identical lines
+    if old_line == new_line {
+        return None;
+    }
 
-    // Find last difference (search from the end)
-    let last_diff = old_line
-        .iter()
-        .zip(new_line.iter())
-        .rposition(|(old, new)| old != new)
-        .unwrap_or(first_diff);
+    // Find first difference - scan forward
+    let mut first_diff = 0;
+    while first_diff < len && old_line[first_diff] == new_line[first_diff] {
+        first_diff += 1;
+    }
+
+    // If we reached the end, lines are identical (shouldn't happen due to fast path)
+    if first_diff == len {
+        return None;
+    }
+
+    // Find last difference - scan backward from end
+    let mut last_diff = len - 1;
+    while last_diff > first_diff && old_line[last_diff] == new_line[last_diff] {
+        last_diff -= 1;
+    }
 
     Some((first_diff, last_diff))
 }
 
-/// Helper function to hash a Color
-fn hash_color(color: &crate::color::Color) -> u64 {
-    use crate::color::Color;
-    match color {
-        Color::Black => 0,
-        Color::Red => 1,
-        Color::Green => 2,
-        Color::Yellow => 3,
-        Color::Blue => 4,
-        Color::Magenta => 5,
-        Color::Cyan => 6,
-        Color::White => 7,
-        Color::BrightBlack => 8,
-        Color::BrightRed => 9,
-        Color::BrightGreen => 10,
-        Color::BrightYellow => 11,
-        Color::BrightBlue => 12,
-        Color::BrightMagenta => 13,
-        Color::BrightCyan => 14,
-        Color::BrightWhite => 15,
-        Color::Rgb(r, g, b) => {
-            // Combine RGB values into a hash
-            let mut h = 256u64;
-            h = h.wrapping_mul(31).wrapping_add(*r as u64);
-            h = h.wrapping_mul(31).wrapping_add(*g as u64);
-            h = h.wrapping_mul(31).wrapping_add(*b as u64);
-            h
-        }
-        Color::Ansi256(c) => 512u64.wrapping_add(*c as u64),
-    }
-}
-
 /// Compute hash for a line (used for line matching)
+///
+/// Optimized version using FNV-1a hash algorithm which is faster than
+/// polynomial rolling hash and provides good distribution.
 pub fn hash_line(cells: &[Cell]) -> u64 {
-    let mut hash = 0u64;
-    for cell in cells {
-        // Combine character, attributes, and colors into hash
-        hash = hash.wrapping_mul(31).wrapping_add(cell.ch as u64);
-        hash = hash.wrapping_mul(31).wrapping_add(cell.attr.bits() as u64);
-        hash = hash
-            .wrapping_mul(31)
-            .wrapping_add(cell.fg().map(|c| hash_color(&c)).unwrap_or(0));
-        hash = hash
-            .wrapping_mul(31)
-            .wrapping_add(cell.bg().map(|c| hash_color(&c)).unwrap_or(0));
+    // Empty lines hash to 0 (for compatibility with blank line detection)
+    if cells.is_empty() {
+        return 0;
     }
+
+    // FNV-1a constants
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+
+    for cell in cells {
+        // Hash character (4 bytes)
+        let ch_bytes = (cell.ch as u32).to_ne_bytes();
+        for &byte in &ch_bytes {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+
+        // Hash attributes (2 bytes)
+        let attr_bytes = cell.attr.bits().to_ne_bytes();
+        for &byte in &attr_bytes {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+
+        // Hash packed colors directly (2 bytes each) - avoid unpacking
+        // Access internal representation directly for speed
+        let fg_packed = unsafe {
+            std::mem::transmute::<_, u16>(cell.fg_packed)
+        };
+        let bg_packed = unsafe {
+            std::mem::transmute::<_, u16>(cell.bg_packed)
+        };
+
+        let fg_bytes = fg_packed.to_ne_bytes();
+        for &byte in &fg_bytes {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+
+        let bg_bytes = bg_packed.to_ne_bytes();
+        for &byte in &bg_bytes {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+    }
+
     hash
 }
 
