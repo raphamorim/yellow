@@ -32,6 +32,9 @@ pub struct Screen {
     current_content: Vec<Vec<Cell>>,
     pending_content: Vec<Vec<Cell>>,
     dirty_lines: Vec<DirtyRegion>,
+    // Performance optimization: line hash cache for scroll detection
+    current_line_hashes: Vec<u64>,
+    pending_line_hashes: Vec<u64>,
 }
 
 impl Screen {
@@ -48,6 +51,10 @@ impl Screen {
         let current_content = vec![vec![Cell::blank(); cols as usize]; rows as usize];
         let pending_content = vec![vec![Cell::blank(); cols as usize]; rows as usize];
         let dirty_lines = vec![DirtyRegion::clean(); rows as usize];
+
+        // Initialize line hashes (blank lines have hash 0)
+        let current_line_hashes = vec![0u64; rows as usize];
+        let pending_line_hashes = vec![0u64; rows as usize];
 
         Ok(Self {
             cursor_x: 0,
@@ -67,6 +74,8 @@ impl Screen {
             current_content,
             pending_content,
             dirty_lines,
+            current_line_hashes,
+            pending_line_hashes,
         })
     }
 
@@ -132,11 +141,12 @@ impl Screen {
             self.pending_content[y][x] = cell;
         }
 
-        // Mark dirty region
+        // Mark dirty region and invalidate hash cache
         let end_x = (start_x + text.len())
             .min(self.cols as usize)
             .saturating_sub(1);
         self.dirty_lines[y].mark(start_x as u16, end_x as u16);
+        self.pending_line_hashes[y] = 0; // Invalidate cache (will be recomputed on refresh)
 
         // Update cursor
         self.cursor_x += text.len() as u16;
@@ -163,8 +173,9 @@ impl Screen {
         let cell = Cell::with_style(ch, self.current_attr, self.current_fg, self.current_bg);
         self.pending_content[y][x] = cell;
 
-        // Mark dirty region
+        // Mark dirty region and invalidate hash cache
         self.dirty_lines[y].mark(x as u16, x as u16);
+        self.pending_line_hashes[y] = 0; // Invalidate cache
 
         // Update cursor
         self.cursor_x += 1;
@@ -233,9 +244,12 @@ impl Screen {
             }
         }
 
-        // Mark all lines as dirty
+        // Mark all lines as dirty and invalidate hashes
         for dirty in &mut self.dirty_lines {
             *dirty = DirtyRegion::full(self.cols);
+        }
+        for hash in &mut self.pending_line_hashes {
+            *hash = 0; // All blank lines = hash 0
         }
 
         self.cursor_x = 0;
@@ -257,8 +271,9 @@ impl Screen {
             self.pending_content[y][x] = Cell::blank();
         }
 
-        // Mark dirty region
+        // Mark dirty region and invalidate hash cache
         self.dirty_lines[y].mark(start_x as u16, self.cols - 1);
+        self.pending_line_hashes[y] = 0;
         Ok(())
     }
 
@@ -277,6 +292,7 @@ impl Screen {
                 self.pending_content[y][x] = Cell::blank();
             }
             self.dirty_lines[y] = DirtyRegion::full(self.cols);
+            self.pending_line_hashes[y] = 0;
         }
 
         Ok(())
@@ -364,6 +380,14 @@ impl Screen {
         // Clear output buffer
         self.buffer.clear();
 
+        // Update line hashes for dirty lines (if not already cached)
+        for y in 0..self.rows as usize {
+            if self.dirty_lines[y].range().is_some() && self.pending_line_hashes[y] == 0 {
+                // Recompute hash for this dirty line
+                self.pending_line_hashes[y] = crate::delta::hash_line(&self.pending_content[y]);
+            }
+        }
+
         // Process each dirty line
         for y in 0..self.rows as usize {
             if let Some((first_x, last_x)) = self.dirty_lines[y].range() {
@@ -430,11 +454,13 @@ impl Screen {
 
         // Swap buffers (current becomes what we just rendered)
         std::mem::swap(&mut self.current_content, &mut self.pending_content);
+        std::mem::swap(&mut self.current_line_hashes, &mut self.pending_line_hashes);
 
         // Copy back to pending (pending should match current after refresh)
         for y in 0..self.rows as usize {
             self.pending_content[y].clone_from_slice(&self.current_content[y]);
         }
+        self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
 
         // Flush to terminal
         io::stdout().write_all(self.buffer.as_bytes())?;
@@ -672,6 +698,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             pending_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             dirty_lines: vec![DirtyRegion::clean(); rows as usize],
+            current_line_hashes: vec![0u64; rows as usize],
+            pending_line_hashes: vec![0u64; rows as usize],
         }
     }
 
@@ -934,6 +962,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Verify buffer has non-zero capacity
@@ -966,6 +996,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Verify capacity is capped at 64KB
@@ -992,6 +1024,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         let initial_capacity = scr.buffer.capacity();
@@ -1026,6 +1060,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move forward 2 cells (should use CUF)
@@ -1055,6 +1091,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move back 3 cells (should use CUB)
@@ -1084,6 +1122,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move down 2 lines (should use CUD)
@@ -1113,6 +1153,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move up 1 line (should use CUU)
@@ -1142,6 +1184,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move 10 cells forward (should use CUP for long distance)
@@ -1171,6 +1215,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Diagonal movement (should use CUP)
@@ -1200,6 +1246,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Move to same position (should use CUP due to dx=0, dy=0)
@@ -1302,6 +1350,8 @@ mod tests {
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
+                    current_line_hashes: vec![0u64; 24],
+            pending_line_hashes: vec![0u64; 24],
         };
 
         // Apply first style
@@ -1346,5 +1396,123 @@ mod tests {
         // Apply same style again - should not emit codes
         scr.print("MoreBold").unwrap();
         assert!(!scr.buffer.contains("\x1b[")); // No escape codes
+    }
+
+    #[test]
+    fn test_hash_invalidation_on_print() {
+        let mut scr = create_test_screen();
+
+        // Initial hash should be 0 (blank line)
+        assert_eq!(scr.pending_line_hashes[0], 0);
+
+        // Print text - hash should be invalidated (set to 0 to mark for recomputation)
+        scr.print("Hello").unwrap();
+        assert_eq!(scr.pending_line_hashes[0], 0); // Still 0, will be computed on refresh
+
+        // After refresh, hash should be computed and cached
+        scr.refresh().unwrap();
+        assert_ne!(scr.current_line_hashes[0], 0); // Hash computed
+        assert_ne!(scr.pending_line_hashes[0], 0); // Copied from current
+    }
+
+    #[test]
+    fn test_hash_invalidation_on_addch() {
+        let mut scr = create_test_screen();
+
+        // Add a character
+        scr.addch('A').unwrap();
+        assert_eq!(scr.pending_line_hashes[0], 0); // Invalidated
+
+        // Refresh computes hash
+        scr.refresh().unwrap();
+        assert_ne!(scr.current_line_hashes[0], 0); // Hash computed
+    }
+
+    #[test]
+    fn test_hash_invalidation_on_clear() {
+        let mut scr = create_test_screen();
+
+        // Write some text and refresh
+        scr.print("Test").unwrap();
+        scr.refresh().unwrap();
+        let hash_before = scr.current_line_hashes[0];
+        assert_ne!(hash_before, 0);
+
+        // Clear should set all hashes to 0 (blank lines)
+        scr.clear().unwrap();
+        for hash in &scr.pending_line_hashes {
+            assert_eq!(*hash, 0);
+        }
+    }
+
+    #[test]
+    fn test_hash_recomputation_on_refresh() {
+        let mut scr = create_test_screen();
+
+        // Write different text on two lines
+        scr.mvprint(0, 0, "Line 1").unwrap();
+        scr.mvprint(1, 0, "Line 2").unwrap();
+
+        // Before refresh, hashes are invalidated
+        assert_eq!(scr.pending_line_hashes[0], 0);
+        assert_eq!(scr.pending_line_hashes[1], 0);
+
+        // Refresh should compute hashes
+        scr.refresh().unwrap();
+        assert_ne!(scr.current_line_hashes[0], 0);
+        assert_ne!(scr.current_line_hashes[1], 0);
+
+        // Different lines should have different hashes
+        assert_ne!(scr.current_line_hashes[0], scr.current_line_hashes[1]);
+    }
+
+    #[test]
+    fn test_identical_lines_same_hash() {
+        let mut scr = create_test_screen();
+
+        // Write identical text on two different lines
+        scr.mvprint(0, 0, "Same").unwrap();
+        scr.mvprint(5, 0, "Same").unwrap();
+
+        scr.refresh().unwrap();
+
+        // Identical lines should produce identical hashes
+        assert_eq!(scr.current_line_hashes[0], scr.current_line_hashes[5]);
+        assert_ne!(scr.current_line_hashes[0], 0);
+    }
+
+    #[test]
+    fn test_hash_persistence_across_refresh() {
+        let mut scr = create_test_screen();
+
+        // Write and refresh
+        scr.print("Test").unwrap();
+        scr.refresh().unwrap();
+        let hash_after_first = scr.current_line_hashes[0];
+
+        // Refresh again without changes
+        scr.refresh().unwrap();
+
+        // Hash should remain the same
+        assert_eq!(scr.current_line_hashes[0], hash_after_first);
+    }
+
+    #[test]
+    fn test_hash_swap_on_refresh() {
+        let mut scr = create_test_screen();
+
+        // Write text
+        scr.print("Test").unwrap();
+
+        // Before refresh, current is blank (hash 0), pending has content (hash 0 but will be computed)
+        assert_eq!(scr.current_line_hashes[0], 0);
+        assert_eq!(scr.pending_line_hashes[0], 0);
+
+        // Refresh swaps buffers
+        scr.refresh().unwrap();
+
+        // After refresh, both should have the computed hash
+        assert_ne!(scr.current_line_hashes[0], 0);
+        assert_eq!(scr.current_line_hashes[0], scr.pending_line_hashes[0]);
     }
 }
