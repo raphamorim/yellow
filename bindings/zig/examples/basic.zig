@@ -1,21 +1,21 @@
 const std = @import("std");
-const yellow = @import("yellow");
+const zaz = @import("zaz");
 
 pub fn main() !void {
     // Initialize screen
-    const screen = try yellow.Screen.init();
+    const screen = try zaz.Screen.init();
     defer screen.deinit() catch {};
 
     // Clear and draw
     try screen.clear();
 
     // Print welcome message
-    try screen.mvprint(2, 4, "Hello from Zig + Yellow!");
+    try screen.mvprint(2, 4, "Hello from Zig + Zaz!");
 
     // Set colors and print
     try screen.setFgColor(255, 200, 0);
     try screen.attrOn(.bold);
-    try screen.mvprint(4, 4, "Yellow bindings working!");
+    try screen.mvprint(4, 4, "Zaz bindings working!");
     try screen.attrOff(.bold);
 
     // Get terminal size

@@ -1,0 +1,9 @@
+[package]
+name = "colors-rgb"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+zaz = { path = "../../.." }
+palette = "0.7"

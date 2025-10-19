@@ -1,4 +1,4 @@
-use yellow::{Attr, Color, Screen};
+use zaz::{Attr, Color, Screen};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize screen

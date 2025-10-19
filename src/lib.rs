@@ -1,10 +1,10 @@
-//! Yellow - A terminal manipulation library
+//! Zaz - A terminal manipulation library
 //!
-//! Yellow provides a simple API for building terminal user interfaces.
+//! Zaz provides a simple API for building terminal user interfaces.
 //!
 //! # Example
 //! ```no_run
-//! use yellow::{Screen, Color, Attr};
+//! use zaz::{Screen, Color, Attr};
 //!
 //! let mut scr = Screen::init()?;
 //! scr.mvprint(5, 10, "Hello, World!")?;

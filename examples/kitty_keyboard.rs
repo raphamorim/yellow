@@ -1,4 +1,4 @@
-use yellow::{Color, Key, KittyFlags, Screen};
+use zaz::{Color, Key, KittyFlags, Screen};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut scr = Screen::init()?;

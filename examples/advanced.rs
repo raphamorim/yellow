@@ -1,4 +1,4 @@
-use yellow::{ACS_BULLET, ACS_DIAMOND, Color, Panel, Screen};
+use zaz::{ACS_BULLET, ACS_DIAMOND, Color, Panel, Screen};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut scr = Screen::init()?;

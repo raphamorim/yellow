@@ -217,7 +217,7 @@ fn average_colors(colors: &[Rgb]) -> Rgb {
 ///
 /// # Example
 /// ```
-/// use yellow::{render_mosaic, MosaicConfig};
+/// use zaz::{render_mosaic, MosaicConfig};
 ///
 /// // Create a 4x4 red square
 /// let data = vec![255u8, 0, 0].repeat(16);

@@ -1,8 +1,8 @@
 /// Demonstrates Unicode block mosaic rendering
 ///
-/// This example shows how to use Yellow's mosaic module to render images
+/// This example shows how to use Zaz's mosaic module to render images
 /// as Unicode block art with ANSI colors in the terminal.
-use yellow::{MosaicConfig, SymbolSet, render_mosaic};
+use zaz::{MosaicConfig, SymbolSet, render_mosaic};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load the yellow.png image from resources

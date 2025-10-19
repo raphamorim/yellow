@@ -1,9 +1,9 @@
-/* Yellow Terminal Library - C Bindings
+/* Zaz Terminal Library - C Bindings
  * Auto-maintained header for FFI
  */
 
-#ifndef YELLOW_H
-#define YELLOW_H
+#ifndef ZAZ_H
+#define ZAZ_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -14,56 +14,56 @@ extern "C" {
 #endif
 
 /* Opaque screen handle */
-typedef struct YellowScreen YellowScreen;
+typedef struct ZazScreen ZazScreen;
 
 /* Key codes - C representation of Rust enum */
 typedef enum {
-    YellowKey_Char = 0,
-    YellowKey_ArrowUp,
-    YellowKey_ArrowDown,
-    YellowKey_ArrowLeft,
-    YellowKey_ArrowRight,
-    YellowKey_Enter,
-    YellowKey_Backspace,
-    YellowKey_Delete,
-    YellowKey_Home,
-    YellowKey_End,
-    YellowKey_PageUp,
-    YellowKey_PageDown,
-    YellowKey_Tab,
-    YellowKey_Escape,
-    YellowKey_F1,
-    YellowKey_F2,
-    YellowKey_F3,
-    YellowKey_F4,
-    YellowKey_F5,
-    YellowKey_F6,
-    YellowKey_F7,
-    YellowKey_F8,
-    YellowKey_F9,
-    YellowKey_F10,
-    YellowKey_F11,
-    YellowKey_F12,
-    YellowKey_Unknown,
-} YellowKeyTag;
+    ZazKey_Char = 0,
+    ZazKey_ArrowUp,
+    ZazKey_ArrowDown,
+    ZazKey_ArrowLeft,
+    ZazKey_ArrowRight,
+    ZazKey_Enter,
+    ZazKey_Backspace,
+    ZazKey_Delete,
+    ZazKey_Home,
+    ZazKey_End,
+    ZazKey_PageUp,
+    ZazKey_PageDown,
+    ZazKey_Tab,
+    ZazKey_Escape,
+    ZazKey_F1,
+    ZazKey_F2,
+    ZazKey_F3,
+    ZazKey_F4,
+    ZazKey_F5,
+    ZazKey_F6,
+    ZazKey_F7,
+    ZazKey_F8,
+    ZazKey_F9,
+    ZazKey_F10,
+    ZazKey_F11,
+    ZazKey_F12,
+    ZazKey_Unknown,
+} ZazKeyTag;
 
 /* Tagged union for key events */
 typedef struct {
-    YellowKeyTag tag;
+    ZazKeyTag tag;
     union {
-        uint32_t char_value; /* For YellowKey_Char */
+        uint32_t char_value; /* For ZazKey_Char */
     } value;
-} YellowKey;
+} ZazKey;
 
 /* Attribute constants */
-#define YELLOW_ATTR_BOLD           1
-#define YELLOW_ATTR_DIM            2
-#define YELLOW_ATTR_ITALIC         4
-#define YELLOW_ATTR_UNDERLINE      8
-#define YELLOW_ATTR_BLINK          16
-#define YELLOW_ATTR_REVERSE        32
-#define YELLOW_ATTR_HIDDEN         64
-#define YELLOW_ATTR_STRIKETHROUGH  128
+#define ZAZ_ATTR_BOLD           1
+#define ZAZ_ATTR_DIM            2
+#define ZAZ_ATTR_ITALIC         4
+#define ZAZ_ATTR_UNDERLINE      8
+#define ZAZ_ATTR_BLINK          16
+#define ZAZ_ATTR_REVERSE        32
+#define ZAZ_ATTR_HIDDEN         64
+#define ZAZ_ATTR_STRIKETHROUGH  128
 
 /* Screen management */
 
@@ -71,82 +71,82 @@ typedef struct {
  * Initialize a new screen
  * Returns NULL on error
  */
-YellowScreen* yellow_init(void);
+ZazScreen* zaz_init(void);
 
 /**
  * Clean up and restore terminal
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_endwin(YellowScreen* screen);
+int32_t zaz_endwin(ZazScreen* screen);
 
 /**
  * Clear the screen
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_clear(YellowScreen* screen);
+int32_t zaz_clear(ZazScreen* screen);
 
 /**
  * Refresh the screen (flush output)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_refresh(YellowScreen* screen);
+int32_t zaz_refresh(ZazScreen* screen);
 
 /**
  * Move cursor to position (y, x)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_move_cursor(YellowScreen* screen, uint16_t y, uint16_t x);
+int32_t zaz_move_cursor(ZazScreen* screen, uint16_t y, uint16_t x);
 
 /**
  * Print string at current cursor position
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_print(YellowScreen* screen, const char* text);
+int32_t zaz_print(ZazScreen* screen, const char* text);
 
 /**
  * Print string at position (y, x)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_mvprint(YellowScreen* screen, uint16_t y, uint16_t x, const char* text);
+int32_t zaz_mvprint(ZazScreen* screen, uint16_t y, uint16_t x, const char* text);
 
 /**
  * Get a key from input
  * Returns 0 on success, -1 on error
  * The key is written to key_out
  */
-int32_t yellow_getch(YellowScreen* screen, YellowKey* key_out);
+int32_t zaz_getch(ZazScreen* screen, ZazKey* key_out);
 
 /**
  * Set foreground color (RGB)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_set_fg_color(YellowScreen* screen, uint8_t r, uint8_t g, uint8_t b);
+int32_t zaz_set_fg_color(ZazScreen* screen, uint8_t r, uint8_t g, uint8_t b);
 
 /**
  * Set background color (RGB)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_set_bg_color(YellowScreen* screen, uint8_t r, uint8_t g, uint8_t b);
+int32_t zaz_set_bg_color(ZazScreen* screen, uint8_t r, uint8_t g, uint8_t b);
 
 /**
  * Turn on attribute
- * Use YELLOW_ATTR_* constants (can be OR'd together)
+ * Use ZAZ_ATTR_* constants (can be OR'd together)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_attron(YellowScreen* screen, uint32_t attr);
+int32_t zaz_attron(ZazScreen* screen, uint32_t attr);
 
 /**
  * Turn off attribute
- * Use YELLOW_ATTR_* constants (can be OR'd together)
+ * Use ZAZ_ATTR_* constants (can be OR'd together)
  * Returns 0 on success, -1 on error
  */
-int32_t yellow_attroff(YellowScreen* screen, uint32_t attr);
+int32_t zaz_attroff(ZazScreen* screen, uint32_t attr);
 
 /**
  * Get terminal size
  * Returns (height << 16) | width, or 0 on error
  */
-uint32_t yellow_get_size(YellowScreen* screen);
+uint32_t zaz_get_size(ZazScreen* screen);
 
 /**
  * Render mosaic (Unicode block art) from RGB image data
@@ -157,9 +157,9 @@ uint32_t yellow_get_size(YellowScreen* screen);
  * @param height - Image height in pixels
  * @param output_width - Output width in terminal cells (0 = auto)
  * @param threshold - Luminance threshold 0-255 (default: 128)
- * @return Malloc'd string with Unicode art (must be freed with yellow_free_string)
+ * @return Malloc'd string with Unicode art (must be freed with zaz_free_string)
  */
-char* yellow_render_mosaic(
+char* zaz_render_mosaic(
     const uint8_t* data,
     size_t data_len,
     size_t width,
@@ -169,12 +169,12 @@ char* yellow_render_mosaic(
 );
 
 /**
- * Free a string returned by yellow_render_mosaic
+ * Free a string returned by zaz_render_mosaic
  */
-void yellow_free_string(char* s);
+void zaz_free_string(char* s);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* YELLOW_H */
+#endif /* ZAZ_H */

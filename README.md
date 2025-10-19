@@ -1,15 +1,16 @@
-# Yellow
+# Zaz
 
 A terminal manipulation library for Rust and C/FFI bindings for other languages.
 
-<img src="examples/resources/demo.png" alt="Yellow's mosaic demo" width="412">
+<img src="examples/resources/demo.png" alt="Zaz's mosaic demo" width="412">
 
-Yellow's mosaic demo with Zig wrapper
+Zaz's mosaic demo with Zig wrapper
 
-<img src="examples/resources/demo-bindings-zig.png" alt="Yellow's mosaic demo with Zig wrapper" width="412">
+<img src="examples/resources/demo-bindings-zig.png" alt="Zaz's mosaic demo with Zig wrapper" width="412">
 
 ## Features
 
+- Effiecient terminal rendering (Smart Style Caching, Paul Heckel's Diff Algorithm, Cost-based Cursor Movement, etc...)
 - Terminal initialization and screen management
 - Cursor positioning and text output
 - RGB color support with ANSI escape codes
@@ -20,48 +21,34 @@ Yellow's mosaic demo with Zig wrapper
 - Unicode block mosaic rendering from images
 - Scrolling regions
 
-## Performance
-
-Yellow implements several ncurses-inspired optimizations for efficient terminal rendering:
-
-- **Smart Style Caching** - Tracks last emitted style state to avoid redundant ANSI escape codes
-- **Cost-based Cursor Movement** - Chooses optimal cursor positioning (relative vs absolute) based on distance
-- **Buffer Pre-allocation** - Pre-allocates output buffers based on terminal size to minimize allocations
-- **Run-Length Encoding** - Optimizes blank runs using `ECH` sequences
-- **Double-Buffering** - Maintains current and pending screen state to compute minimal deltas
-- **Line Hash Caching** - Uses rolling hashes for efficient change detection
-- **Scroll Detection** - Detects scrolled regions using Modified Heckel's Algorithm and uses hardware scroll sequences
-
-These optimizations result in 85-95% reduction in terminal output for typical operations compared to naive full-screen redraws.
-
 ## C FFI API
 
 The library exports a C-compatible API for use with other languages:
 
 ### Screen Management
-- `yellow_init()` - Initialize screen
-- `yellow_endwin()` - Clean up and restore terminal
-- `yellow_clear()` - Clear screen
-- `yellow_refresh()` - Refresh display
+- `zaz_init()` - Initialize screen
+- `zaz_endwin()` - Clean up and restore terminal
+- `zaz_clear()` - Clear screen
+- `zaz_refresh()` - Refresh display
 
 ### Output
-- `yellow_print()` - Print at cursor position
-- `yellow_mvprint()` - Print at specific position
-- `yellow_move_cursor()` - Move cursor
+- `zaz_print()` - Print at cursor position
+- `zaz_mvprint()` - Print at specific position
+- `zaz_move_cursor()` - Move cursor
 
 ### Colors and Attributes
-- `yellow_set_fg_color()` - Set foreground RGB color
-- `yellow_set_bg_color()` - Set background RGB color
-- `yellow_attron()` - Enable text attributes
-- `yellow_attroff()` - Disable text attributes
+- `zaz_set_fg_color()` - Set foreground RGB color
+- `zaz_set_bg_color()` - Set background RGB color
+- `zaz_attron()` - Enable text attributes
+- `zaz_attroff()` - Disable text attributes
 
 ### Input
-- `yellow_getch()` - Get key input
+- `zaz_getch()` - Get key input
 
 ### Utilities
-- `yellow_get_size()` - Get terminal dimensions
-- `yellow_render_mosaic()` - Render image as Unicode art
-- `yellow_free_string()` - Free mosaic string
+- `zaz_get_size()` - Get terminal dimensions
+- `zaz_render_mosaic()` - Render image as Unicode art
+- `zaz_free_string()` - Free mosaic string
 
 
 ## Installation
@@ -72,34 +59,34 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-yellow = "*"
+zaz = "*"
 ```
 
 ### Zig
 
-To use Yellow in your Zig project:
+To use Zaz in your Zig project:
 
-1. Build the Yellow library:
+1. Build the Zaz library:
 ```bash
 cargo build --release
 ```
 
 2. Copy the necessary files to your project:
 ```bash
-cp bindings/zig/yellow.zig your-project/
-cp bindings/zig/yellow.h your-project/
-cp target/release/libyellow.dylib your-project/  # macOS
+cp bindings/zig/zaz.zig your-project/
+cp bindings/zig/zaz.h your-project/
+cp target/release/libzaz.dylib your-project/  # macOS
 # or
-cp target/release/libyellow.so your-project/     # Linux
+cp target/release/libzaz.so your-project/     # Linux
 ```
 
 3. In your `build.zig`:
 ```zig
-const yellow_mod = b.createModule(.{
-    .root_source_file = b.path("yellow.zig"),
+const zaz_mod = b.createModule(.{
+    .root_source_file = b.path("zaz.zig"),
     .link_libc = true,
 });
-yellow_mod.addIncludePath(b.path("."));
+zaz_mod.addIncludePath(b.path("."));
 
 const exe = b.addExecutable(.{
     .name = "my-app",
@@ -107,10 +94,10 @@ const exe = b.addExecutable(.{
     .target = target,
     .optimize = optimize,
 });
-exe.root_module.addImport("yellow", yellow_mod);
+exe.root_module.addImport("zaz", zaz_mod);
 exe.addIncludePath(b.path("."));
 exe.addLibraryPath(b.path("."));
-exe.linkSystemLibrary("yellow");
+exe.linkSystemLibrary("zaz");
 exe.linkLibC();
 ```
 
@@ -128,13 +115,13 @@ LD_LIBRARY_PATH=. zig build run
 ### Rust Example
 
 ```rust
-use yellow::{Screen, Color, Attr};
+use zaz::{Screen, Color, Attr};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut scr = Screen::init()?;
 
     scr.clear()?;
-    scr.mvprint(2, 4, "Hello from Yellow!")?;
+    scr.mvprint(2, 4, "Hello from Zaz!")?;
 
     scr.set_fg(Color::Rgb(255, 200, 0))?;
     scr.attron(Attr::BOLD)?;
@@ -152,14 +139,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```zig
 const std = @import("std");
-const yellow = @import("yellow");
+const zaz = @import("zaz");
 
 pub fn main() !void {
-    const screen = try yellow.Screen.init();
+    const screen = try zaz.Screen.init();
     defer screen.deinit() catch {};
 
     try screen.clear();
-    try screen.mvprint(2, 4, "Hello from Zig + Yellow!");
+    try screen.mvprint(2, 4, "Hello from Zig + Zaz!");
 
     try screen.setFgColor(255, 200, 0);
     try screen.attrOn(.bold);
@@ -223,12 +210,12 @@ On Linux, use `LD_LIBRARY_PATH` instead of `DYLD_LIBRARY_PATH`.
 
 ## Mosaic Rendering
 
-Yellow includes a mosaic module that converts images to Unicode block art with ANSI colors.
+Zaz includes a mosaic module that converts images to Unicode block art with ANSI colors.
 
 Example:
 
 ```rust
-use yellow::{render_mosaic, MosaicConfig};
+use zaz::{render_mosaic, MosaicConfig};
 
 let img = image::open("examples/resources/yellow.png")?;
 let rgb_img = img.to_rgb8();
@@ -243,9 +230,9 @@ println!("{}", art);
 The same functionality is available through the C FFI:
 
 ```c
-char* mosaic = yellow_render_mosaic(data, data_len, width, height, 60, 100);
+char* mosaic = zaz_render_mosaic(data, data_len, width, height, 60, 100);
 printf("%s\n", mosaic);
-yellow_free_string(mosaic);
+zaz_free_string(mosaic);
 ```
 
 ## License

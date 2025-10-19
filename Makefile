@@ -1,6 +1,3 @@
-# Yellow Library Bindings Makefile
-# Automates building Rust library, generating C headers, and compiling Zig bindings
-
 .PHONY: all clean bindings lib zig-example help test
 
 # Default target
@@ -8,12 +5,12 @@ all: bindings zig-example
 
 # Build the Rust library (cdylib for C bindings)
 lib:
-	@echo "Building Yellow Rust library..."
+	@echo "Building Rust library..."
 	cargo build --release
 
 # Generate C bindings header
 bindings: lib
-	@echo "C header generated at: bindings/yellow.h"
+	@echo "C header generated at: bindings/h"
 
 # Build Zig examples
 zig-example: bindings zig-basic zig-mosaic
@@ -69,7 +66,7 @@ clean:
 
 # Display help
 help:
-	@echo "Yellow Library Bindings - Makefile targets:"
+	@echo "Library Bindings - Makefile targets:"
 	@echo ""
 	@echo "  make                - Build everything (lib + bindings + zig examples)"
 	@echo "  make lib            - Build the Rust library"

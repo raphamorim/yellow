@@ -1,4 +1,4 @@
-use yellow::{ImageFormat, ImagePlacement, KittyImage, Screen, SixelImage};
+use zaz::{ImageFormat, ImagePlacement, KittyImage, Screen, SixelImage};
 
 /// Generate a simple gradient image in RGB format
 fn generate_gradient(width: u32, height: u32) -> Vec<u8> {

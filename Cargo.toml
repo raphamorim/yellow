@@ -1,6 +1,8 @@
 [package]
-name = "yellow"
-version = "0.0.2"
+name = "zaz"
+description = "cross-platform textual UI toolkit with bindings for Rust, C++, Zig and etc"
+author = "Raphael Amorim <rapha850@gmail.com>"
+version = "0.0.1"
 edition = "2024"
 
 [lib]

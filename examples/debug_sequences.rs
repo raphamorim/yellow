@@ -1,6 +1,6 @@
 /// Debug tool to output raw escape sequences
 /// This helps verify the format is correct
-use yellow::{ImageFormat, KittyImage, SixelImage};
+use zaz::{ImageFormat, KittyImage, SixelImage};
 
 fn main() {
     println!("=== Image Protocol Debug ===\n");

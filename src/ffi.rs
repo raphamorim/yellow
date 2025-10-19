@@ -1,4 +1,4 @@
-//! C FFI bindings for Yellow library
+//! C FFI bindings for Zaz library
 //!
 //! This module provides C-compatible exports for use with other languages.
 
@@ -10,14 +10,14 @@ use crate::{Attr, Color, Key, Screen};
 
 /// Opaque handle to a Screen
 #[repr(C)]
-pub struct YellowScreen {
+pub struct ZazScreen {
     _private: [u8; 0],
 }
 
 /// Key tag for discriminated union
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub enum YellowKeyTag {
+pub enum ZazKeyTag {
     Char = 0,
     ArrowUp,
     ArrowDown,
@@ -50,130 +50,130 @@ pub enum YellowKeyTag {
 /// Union for key value
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union YellowKeyValue {
+pub union ZazKeyValue {
     pub char_value: u32,
 }
 
 /// Key codes for input (tagged union)
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct YellowKey {
-    pub tag: YellowKeyTag,
-    pub value: YellowKeyValue,
+pub struct ZazKey {
+    pub tag: ZazKeyTag,
+    pub value: ZazKeyValue,
 }
 
-impl From<Key> for YellowKey {
+impl From<Key> for ZazKey {
     fn from(key: Key) -> Self {
         match key {
-            Key::Char(c) => YellowKey {
-                tag: YellowKeyTag::Char,
-                value: YellowKeyValue {
+            Key::Char(c) => ZazKey {
+                tag: ZazKeyTag::Char,
+                value: ZazKeyValue {
                     char_value: c as u32,
                 },
             },
-            Key::Up => YellowKey {
-                tag: YellowKeyTag::ArrowUp,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Up => ZazKey {
+                tag: ZazKeyTag::ArrowUp,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Down => YellowKey {
-                tag: YellowKeyTag::ArrowDown,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Down => ZazKey {
+                tag: ZazKeyTag::ArrowDown,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Left => YellowKey {
-                tag: YellowKeyTag::ArrowLeft,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Left => ZazKey {
+                tag: ZazKeyTag::ArrowLeft,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Right => YellowKey {
-                tag: YellowKeyTag::ArrowRight,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Right => ZazKey {
+                tag: ZazKeyTag::ArrowRight,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Enter => YellowKey {
-                tag: YellowKeyTag::Enter,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Enter => ZazKey {
+                tag: ZazKeyTag::Enter,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Backspace => YellowKey {
-                tag: YellowKeyTag::Backspace,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Backspace => ZazKey {
+                tag: ZazKeyTag::Backspace,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Delete => YellowKey {
-                tag: YellowKeyTag::Delete,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Delete => ZazKey {
+                tag: ZazKeyTag::Delete,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Home => YellowKey {
-                tag: YellowKeyTag::Home,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Home => ZazKey {
+                tag: ZazKeyTag::Home,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::End => YellowKey {
-                tag: YellowKeyTag::End,
-                value: YellowKeyValue { char_value: 0 },
+            Key::End => ZazKey {
+                tag: ZazKeyTag::End,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::PageUp => YellowKey {
-                tag: YellowKeyTag::PageUp,
-                value: YellowKeyValue { char_value: 0 },
+            Key::PageUp => ZazKey {
+                tag: ZazKeyTag::PageUp,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::PageDown => YellowKey {
-                tag: YellowKeyTag::PageDown,
-                value: YellowKeyValue { char_value: 0 },
+            Key::PageDown => ZazKey {
+                tag: ZazKeyTag::PageDown,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Tab => YellowKey {
-                tag: YellowKeyTag::Tab,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Tab => ZazKey {
+                tag: ZazKeyTag::Tab,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::Escape => YellowKey {
-                tag: YellowKeyTag::Escape,
-                value: YellowKeyValue { char_value: 0 },
+            Key::Escape => ZazKey {
+                tag: ZazKeyTag::Escape,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(1) => YellowKey {
-                tag: YellowKeyTag::F1,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(1) => ZazKey {
+                tag: ZazKeyTag::F1,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(2) => YellowKey {
-                tag: YellowKeyTag::F2,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(2) => ZazKey {
+                tag: ZazKeyTag::F2,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(3) => YellowKey {
-                tag: YellowKeyTag::F3,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(3) => ZazKey {
+                tag: ZazKeyTag::F3,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(4) => YellowKey {
-                tag: YellowKeyTag::F4,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(4) => ZazKey {
+                tag: ZazKeyTag::F4,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(5) => YellowKey {
-                tag: YellowKeyTag::F5,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(5) => ZazKey {
+                tag: ZazKeyTag::F5,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(6) => YellowKey {
-                tag: YellowKeyTag::F6,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(6) => ZazKey {
+                tag: ZazKeyTag::F6,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(7) => YellowKey {
-                tag: YellowKeyTag::F7,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(7) => ZazKey {
+                tag: ZazKeyTag::F7,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(8) => YellowKey {
-                tag: YellowKeyTag::F8,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(8) => ZazKey {
+                tag: ZazKeyTag::F8,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(9) => YellowKey {
-                tag: YellowKeyTag::F9,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(9) => ZazKey {
+                tag: ZazKeyTag::F9,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(10) => YellowKey {
-                tag: YellowKeyTag::F10,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(10) => ZazKey {
+                tag: ZazKeyTag::F10,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(11) => YellowKey {
-                tag: YellowKeyTag::F11,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(11) => ZazKey {
+                tag: ZazKeyTag::F11,
+                value: ZazKeyValue { char_value: 0 },
             },
-            Key::F(12) => YellowKey {
-                tag: YellowKeyTag::F12,
-                value: YellowKeyValue { char_value: 0 },
+            Key::F(12) => ZazKey {
+                tag: ZazKeyTag::F12,
+                value: ZazKeyValue { char_value: 0 },
             },
-            _ => YellowKey {
-                tag: YellowKeyTag::Unknown,
-                value: YellowKeyValue { char_value: 0 },
+            _ => ZazKey {
+                tag: ZazKeyTag::Unknown,
+                value: ZazKeyValue { char_value: 0 },
             },
         }
     }
@@ -183,16 +183,16 @@ impl From<Key> for YellowKey {
 ///
 /// Returns NULL on error
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_init() -> *mut YellowScreen {
+pub extern "C" fn zaz_init() -> *mut ZazScreen {
     match Screen::init() {
-        Ok(screen) => Box::into_raw(Box::new(screen)) as *mut YellowScreen,
+        Ok(screen) => Box::into_raw(Box::new(screen)) as *mut ZazScreen,
         Err(_) => ptr::null_mut(),
     }
 }
 
 /// Clean up and restore terminal
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_endwin(screen: *mut YellowScreen) -> i32 {
+pub extern "C" fn zaz_endwin(screen: *mut ZazScreen) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -208,7 +208,7 @@ pub extern "C" fn yellow_endwin(screen: *mut YellowScreen) -> i32 {
 
 /// Clear the screen
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_clear(screen: *mut YellowScreen) -> i32 {
+pub extern "C" fn zaz_clear(screen: *mut ZazScreen) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -224,7 +224,7 @@ pub extern "C" fn yellow_clear(screen: *mut YellowScreen) -> i32 {
 
 /// Refresh the screen (flush output)
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_refresh(screen: *mut YellowScreen) -> i32 {
+pub extern "C" fn zaz_refresh(screen: *mut ZazScreen) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -240,7 +240,7 @@ pub extern "C" fn yellow_refresh(screen: *mut YellowScreen) -> i32 {
 
 /// Move cursor to position (y, x)
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_move_cursor(screen: *mut YellowScreen, y: u16, x: u16) -> i32 {
+pub extern "C" fn zaz_move_cursor(screen: *mut ZazScreen, y: u16, x: u16) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -256,7 +256,7 @@ pub extern "C" fn yellow_move_cursor(screen: *mut YellowScreen, y: u16, x: u16) 
 
 /// Print string at current cursor position
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_print(screen: *mut YellowScreen, text: *const c_char) -> i32 {
+pub extern "C" fn zaz_print(screen: *mut ZazScreen, text: *const c_char) -> i32 {
     if screen.is_null() || text.is_null() {
         return -1;
     }
@@ -277,8 +277,8 @@ pub extern "C" fn yellow_print(screen: *mut YellowScreen, text: *const c_char) -
 
 /// Print string at position (y, x)
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_mvprint(
-    screen: *mut YellowScreen,
+pub extern "C" fn zaz_mvprint(
+    screen: *mut ZazScreen,
     y: u16,
     x: u16,
     text: *const c_char,
@@ -303,7 +303,7 @@ pub extern "C" fn yellow_mvprint(
 
 /// Get a key from input
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_getch(screen: *mut YellowScreen, key_out: *mut YellowKey) -> i32 {
+pub extern "C" fn zaz_getch(screen: *mut ZazScreen, key_out: *mut ZazKey) -> i32 {
     if screen.is_null() || key_out.is_null() {
         return -1;
     }
@@ -322,7 +322,7 @@ pub extern "C" fn yellow_getch(screen: *mut YellowScreen, key_out: *mut YellowKe
 
 /// Set foreground color
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_set_fg_color(screen: *mut YellowScreen, r: u8, g: u8, b: u8) -> i32 {
+pub extern "C" fn zaz_set_fg_color(screen: *mut ZazScreen, r: u8, g: u8, b: u8) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -339,7 +339,7 @@ pub extern "C" fn yellow_set_fg_color(screen: *mut YellowScreen, r: u8, g: u8, b
 
 /// Set background color
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_set_bg_color(screen: *mut YellowScreen, r: u8, g: u8, b: u8) -> i32 {
+pub extern "C" fn zaz_set_bg_color(screen: *mut ZazScreen, r: u8, g: u8, b: u8) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -356,7 +356,7 @@ pub extern "C" fn yellow_set_bg_color(screen: *mut YellowScreen, r: u8, g: u8, b
 
 /// Turn on attribute (BOLD=1, DIM=2, ITALIC=4, UNDERLINE=8, BLINK=16, REVERSE=32, STRIKETHROUGH=128)
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_attron(screen: *mut YellowScreen, attr: u32) -> i32 {
+pub extern "C" fn zaz_attron(screen: *mut ZazScreen, attr: u32) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -373,7 +373,7 @@ pub extern "C" fn yellow_attron(screen: *mut YellowScreen, attr: u32) -> i32 {
 
 /// Turn off attribute
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_attroff(screen: *mut YellowScreen, attr: u32) -> i32 {
+pub extern "C" fn zaz_attroff(screen: *mut ZazScreen, attr: u32) -> i32 {
     if screen.is_null() {
         return -1;
     }
@@ -390,7 +390,7 @@ pub extern "C" fn yellow_attroff(screen: *mut YellowScreen, attr: u32) -> i32 {
 
 /// Get terminal size (returns height in high 16 bits, width in low 16 bits, or 0 on error)
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_get_size(screen: *mut YellowScreen) -> u32 {
+pub extern "C" fn zaz_get_size(screen: *mut ZazScreen) -> u32 {
     if screen.is_null() {
         return 0;
     }
@@ -409,7 +409,7 @@ pub extern "C" fn yellow_get_size(screen: *mut YellowScreen) -> u32 {
 /// Returns a malloc'd C string that must be freed by the caller
 /// Returns NULL on error
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_render_mosaic(
+pub extern "C" fn zaz_render_mosaic(
     data: *const u8,
     data_len: usize,
     width: usize,
@@ -436,9 +436,9 @@ pub extern "C" fn yellow_render_mosaic(
     }
 }
 
-/// Free a string returned by yellow_render_mosaic
+/// Free a string returned by zaz_render_mosaic
 #[unsafe(no_mangle)]
-pub extern "C" fn yellow_free_string(s: *mut i8) {
+pub extern "C" fn zaz_free_string(s: *mut i8) {
     if !s.is_null() {
         unsafe {
             let _ = std::ffi::CString::from_raw(s);
