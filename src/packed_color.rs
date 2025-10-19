@@ -54,6 +54,7 @@ impl PackedColor {
             Some(Color::BrightWhite) => Self::from_basic(15),
             Some(Color::Ansi256(c)) => Self::from_256(c),
             Some(Color::Rgb(r, g, b)) => Self::from_rgb(r, g, b),
+            Some(Color::Reset) => Self::none(), // Reset is treated as no color (terminal default)
         }
     }
 

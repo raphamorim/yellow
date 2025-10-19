@@ -19,6 +19,8 @@ pub enum Color {
     BrightWhite,
     Rgb(u8, u8, u8),
     Ansi256(u8),
+    /// Reset to terminal default color
+    Reset,
 }
 
 impl Color {
@@ -44,6 +46,7 @@ impl Color {
             Color::BrightWhite => buf.push_str("97"),
             Color::Rgb(r, g, b) => write!(buf, "38;2;{};{};{}", r, g, b).unwrap(),
             Color::Ansi256(c) => write!(buf, "38;5;{}", c).unwrap(),
+            Color::Reset => buf.push_str("39"),
         }
     }
 
@@ -69,6 +72,7 @@ impl Color {
             Color::BrightWhite => buf.push_str("107"),
             Color::Rgb(r, g, b) => write!(buf, "48;2;{};{};{}", r, g, b).unwrap(),
             Color::Ansi256(c) => write!(buf, "48;5;{}", c).unwrap(),
+            Color::Reset => buf.push_str("49"),
         }
     }
 
@@ -132,5 +136,11 @@ mod tests {
         assert_ne!(Color::Red, Color::Blue);
         assert_eq!(Color::Rgb(255, 0, 0), Color::Rgb(255, 0, 0));
         assert_ne!(Color::Rgb(255, 0, 0), Color::Rgb(255, 0, 1));
+    }
+
+    #[test]
+    fn test_color_reset() {
+        assert_eq!(Color::Reset.to_ansi_fg(), "39");
+        assert_eq!(Color::Reset.to_ansi_bg(), "49");
     }
 }

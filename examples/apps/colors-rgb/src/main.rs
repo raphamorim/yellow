@@ -8,13 +8,13 @@
 //! - FPS calculation and display
 //! - Using half-block characters for higher resolution color display
 //!
-//! Press any key to quit.
+//! Press q to quit.
 
 use std::time::{Duration, Instant};
 
 use palette::convert::FromColorUnclamped;
 use palette::{Okhsv, Srgb};
-use zaz::{Attr, Color, Screen};
+use zaz::{Color, Screen};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new()?;
@@ -81,31 +81,28 @@ impl App {
         // Clear screen
         self.screen.clear()?;
 
-        // Render top bar with title and FPS
-        // Draw a separator line
-        let separator = "─".repeat(cols as usize);
-        self.screen.mvprint(1, 0, &separator)?;
+        // Reset colors to default for text rendering (transparent background)
+        self.screen.set_fg(Color::Rgb(255, 255, 255))?;
+        self.screen.set_bg(Color::Reset)?;
 
-        // Render title (centered)
-        let title = "colors_rgb example. Press any key to quit";
-        let title_x = (cols as usize / 2).saturating_sub(title.len() / 2);
+        // Render title (centered in left portion, leaving 8 chars for FPS on right)
+        let title = "colors_rgb example. Press q to quit";
+        let title_area_width = cols.saturating_sub(8);
+        let title_x = (title_area_width as usize / 2).saturating_sub(title.len() / 2);
         self.screen.mvprint(0, title_x as u16, title)?;
 
-        // Render FPS in top left with styling
+        // Render FPS on the right side (8 chars from the right edge)
         self.fps_widget.calculate_fps();
         if let Some(fps) = self.fps_widget.fps {
-            self.screen.attron(Attr::BOLD)?;
-            self.screen.set_fg(Color::Rgb(100, 200, 255))?;
-            let fps_text = format!("FPS: {:.1}", fps);
-            self.screen.mvprint(0, 0, &fps_text)?;
-            self.screen.attroff(Attr::BOLD)?;
-            self.screen.set_fg(Color::Rgb(255, 255, 255))?;
+            let fps_text = format!("{:.1} fps", fps);
+            let fps_x = cols.saturating_sub(fps_text.len() as u16);
+            self.screen.mvprint(0, fps_x, &fps_text)?;
         }
 
-        // Render colors widget (starting from row 2, after separator)
-        let colors_height = rows.saturating_sub(2);
+        // Render colors widget (starting from row 1, right after title)
+        let colors_height = rows.saturating_sub(1);
         self.colors_widget.setup_colors(cols, colors_height);
-        self.colors_widget.render(&mut self.screen, 2, cols)?;
+        self.colors_widget.render(&mut self.screen, 1, cols)?;
 
         self.screen.refresh()?;
         Ok(())
