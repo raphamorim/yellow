@@ -25,8 +25,6 @@ pub struct Screen {
     last_emitted_attr: Attr,
     last_emitted_fg: Option<Color>,
     last_emitted_bg: Option<Color>,
-    // Performance optimization: reuse style code buffer to avoid allocations
-    style_code_buffer: Vec<String>,
     // Performance optimization: pre-allocated buffer for ANSI sequence building
     style_sequence_buf: String,
     // Performance optimization: double-buffering for delta updates
@@ -76,7 +74,6 @@ impl Screen {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::with_capacity(5), // Pre-allocate for typical usage
             style_sequence_buf: String::with_capacity(50), // Pre-allocated for ANSI sequences
             current_content,
             pending_content,
@@ -446,8 +443,6 @@ impl Screen {
 
     /// Refresh the screen (flush buffer to stdout)
     pub fn refresh(&mut self) -> Result<()> {
-        use std::io::Write as IoWrite;
-
         // Clear output buffer
         self.buffer.clear();
 
@@ -571,7 +566,6 @@ impl Screen {
                                         self.style_sequence_buf.push(';');
                                     }
                                     bg.write_ansi_bg(&mut self.style_sequence_buf);
-                                    needs_separator = true;
                                 }
 
                                 // Emit ANSI sequence if we added any codes
@@ -753,7 +747,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             pending_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
@@ -1022,7 +1015,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1061,7 +1053,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1092,7 +1083,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1133,7 +1123,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1169,7 +1158,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1205,7 +1193,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1241,7 +1228,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1277,7 +1263,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1313,7 +1298,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1349,7 +1333,6 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
-            style_code_buffer: Vec::new(),
             style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
@@ -1442,79 +1425,6 @@ mod tests {
         for i in 0..7 {
             assert_eq!(scr.pending_content[0][i].ch, ' ');
         }
-    }
-
-    #[test]
-    fn test_style_code_buffer_reuse() {
-        let mut scr = Screen {
-            cursor_x: 0,
-            cursor_y: 0,
-            current_attr: Attr::NORMAL,
-            current_fg: None,
-            current_bg: None,
-            color_pairs: HashMap::new(),
-            cursor_visible: false,
-            buffer: String::new(),
-            last_emitted_attr: Attr::NORMAL,
-            last_emitted_fg: None,
-            last_emitted_bg: None,
-            style_code_buffer: Vec::with_capacity(5),
-            style_sequence_buf: String::new(),
-            rows: 24,
-            cols: 80,
-            current_content: vec![vec![Cell::blank(); 80]; 24],
-            pending_content: vec![vec![Cell::blank(); 80]; 24],
-            dirty_lines: vec![DirtyRegion::clean(); 24],
-                    current_line_hashes: vec![0u64; 24],
-            pending_line_hashes: vec![0u64; 24],
-            #[cfg(unix)]
-            stdin_fd: 0,
-            check_interval: 5,
-            fifo_hold: false,
-        };
-
-        // Apply first style
-        scr.attron(Attr::BOLD).unwrap();
-        scr.print("Bold").unwrap();
-
-        // Buffer should have some capacity
-        let capacity_after_first = scr.style_code_buffer.capacity();
-        assert!(capacity_after_first >= 5);
-
-        scr.buffer.clear();
-
-        // Apply second style (should reuse buffer)
-        scr.set_fg(Color::Red).unwrap();
-        scr.print("Red").unwrap();
-
-        // Capacity should not have changed (buffer reused)
-        assert_eq!(scr.style_code_buffer.capacity(), capacity_after_first);
-
-        scr.buffer.clear();
-
-        // Apply third style (should still reuse buffer)
-        scr.attroff(Attr::BOLD).unwrap();
-        scr.print("Normal").unwrap();
-
-        // Capacity should still not have changed
-        assert_eq!(scr.style_code_buffer.capacity(), capacity_after_first);
-    }
-
-    #[test]
-    fn test_style_code_buffer_cleared() {
-        let mut scr = create_test_screen();
-
-        // Apply style
-        scr.attron(Attr::BOLD).unwrap();
-        scr.print("Bold").unwrap();
-
-        // Buffer should be cleared after apply_style
-        // (We can't directly check the private field, but we can verify behavior)
-        scr.buffer.clear();
-
-        // Apply same style again - should not emit codes
-        scr.print("MoreBold").unwrap();
-        assert!(!scr.buffer.contains("\x1b[")); // No escape codes
     }
 
     #[test]

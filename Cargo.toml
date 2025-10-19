@@ -1,7 +1,7 @@
 [package]
 name = "zaz"
 description = "cross-platform textual UI toolkit with bindings for Rust, C++, Zig and etc"
-author = "Raphael Amorim <rapha850@gmail.com>"
+authors = ["Raphael Amorim <rapha850@gmail.com>"]
 license = "MIT"
 version = "0.0.2"
 edition = "2024"
