@@ -8,9 +8,6 @@ use std::io;
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
 
-#[cfg(unix)]
-const STDOUT_FD: RawFd = 1;
-
 /// Get the file descriptor to write to (stdout in production, /dev/null in tests)
 #[cfg(all(unix, test))]
 fn get_output_fd() -> RawFd {
@@ -29,7 +26,7 @@ fn get_output_fd() -> RawFd {
 #[cfg(all(unix, not(test)))]
 #[inline]
 fn get_output_fd() -> RawFd {
-    STDOUT_FD
+    1 // STDOUT_FD
 }
 
 /// Write bytes directly to stdout using unbuffered syscall

@@ -18,7 +18,6 @@ impl PackedColor {
     const DATA_MASK: u16 = 0xFFF;
 
     // Color types
-    const TYPE_NONE: u16 = 0;
     const TYPE_BASIC: u16 = 1;
     const TYPE_256: u16 = 2;
     const TYPE_RGB: u16 = 3;

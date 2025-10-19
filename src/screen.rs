@@ -513,56 +513,69 @@ impl Screen {
                                 self.last_emitted_fg = cell_style.1;
                                 self.last_emitted_bg = cell_style.2;
 
-                                // Build and emit style codes
-                                self.style_code_buffer.clear();
+                                // Build and emit style codes directly (zero-allocation path)
+                                self.style_sequence_buf.clear();
+                                let mut needs_separator = false;
+
+                                // Helper macro to add code with separator
+                                macro_rules! add_code {
+                                    ($code:expr) => {
+                                        if needs_separator {
+                                            self.style_sequence_buf.push(';');
+                                        }
+                                        self.style_sequence_buf.push_str($code);
+                                        needs_separator = true;
+                                    };
+                                }
 
                                 // Add attribute codes
                                 if cell_style.0.is_empty() {
-                                    self.style_code_buffer.push("0".to_string()); // Reset
+                                    add_code!("0"); // Reset
                                 } else {
                                     if cell_style.0.contains(Attr::BOLD) {
-                                        self.style_code_buffer.push("1".to_string());
+                                        add_code!("1");
                                     }
                                     if cell_style.0.contains(Attr::DIM) {
-                                        self.style_code_buffer.push("2".to_string());
+                                        add_code!("2");
                                     }
                                     if cell_style.0.contains(Attr::ITALIC) {
-                                        self.style_code_buffer.push("3".to_string());
+                                        add_code!("3");
                                     }
                                     if cell_style.0.contains(Attr::UNDERLINE) {
-                                        self.style_code_buffer.push("4".to_string());
+                                        add_code!("4");
                                     }
                                     if cell_style.0.contains(Attr::BLINK) {
-                                        self.style_code_buffer.push("5".to_string());
+                                        add_code!("5");
                                     }
                                     if cell_style.0.contains(Attr::REVERSE) {
-                                        self.style_code_buffer.push("7".to_string());
+                                        add_code!("7");
                                     }
                                     if cell_style.0.contains(Attr::HIDDEN) {
-                                        self.style_code_buffer.push("8".to_string());
+                                        add_code!("8");
                                     }
                                     if cell_style.0.contains(Attr::STRIKETHROUGH) {
-                                        self.style_code_buffer.push("9".to_string());
+                                        add_code!("9");
                                     }
                                 }
 
-                                // Add color codes
+                                // Add color codes directly to buffer
                                 if let Some(fg) = cell_style.1 {
-                                    self.style_code_buffer.push(fg.to_ansi_fg());
+                                    if needs_separator {
+                                        self.style_sequence_buf.push(';');
+                                    }
+                                    fg.write_ansi_fg(&mut self.style_sequence_buf);
+                                    needs_separator = true;
                                 }
                                 if let Some(bg) = cell_style.2 {
-                                    self.style_code_buffer.push(bg.to_ansi_bg());
+                                    if needs_separator {
+                                        self.style_sequence_buf.push(';');
+                                    }
+                                    bg.write_ansi_bg(&mut self.style_sequence_buf);
+                                    needs_separator = true;
                                 }
 
-                                // Emit ANSI sequence
-                                if !self.style_code_buffer.is_empty() {
-                                    self.style_sequence_buf.clear();
-                                    for (i, code) in self.style_code_buffer.iter().enumerate() {
-                                        if i > 0 {
-                                            self.style_sequence_buf.push(';');
-                                        }
-                                        self.style_sequence_buf.push_str(code);
-                                    }
+                                // Emit ANSI sequence if we added any codes
+                                if !self.style_sequence_buf.is_empty() {
                                     write!(self.buffer, "\x1b[{}m", self.style_sequence_buf)?;
                                 }
                             }
@@ -628,74 +641,6 @@ impl Screen {
             }
             self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
         }
-
-        Ok(())
-    }
-
-    /// Apply style for a specific cell
-    fn apply_style_for_cell(&mut self, cell: &Cell) -> Result<()> {
-        if cell.attr == self.last_emitted_attr
-            && cell.fg() == self.last_emitted_fg
-            && cell.bg() == self.last_emitted_bg
-        {
-            return Ok(()); // Style unchanged
-        }
-
-        self.style_code_buffer.clear();
-
-        // Reset if needed
-        if cell.attr == Attr::NORMAL && cell.fg().is_none() && cell.bg().is_none() {
-            write!(self.buffer, "\x1b[0m")?;
-        } else {
-            // Build SGR codes
-            if cell.attr.contains(Attr::BOLD) {
-                self.style_code_buffer.push("1".to_string());
-            }
-            if cell.attr.contains(Attr::DIM) {
-                self.style_code_buffer.push("2".to_string());
-            }
-            if cell.attr.contains(Attr::ITALIC) {
-                self.style_code_buffer.push("3".to_string());
-            }
-            if cell.attr.contains(Attr::UNDERLINE) {
-                self.style_code_buffer.push("4".to_string());
-            }
-            if cell.attr.contains(Attr::BLINK) {
-                self.style_code_buffer.push("5".to_string());
-            }
-            if cell.attr.contains(Attr::REVERSE) {
-                self.style_code_buffer.push("7".to_string());
-            }
-            if cell.attr.contains(Attr::HIDDEN) {
-                self.style_code_buffer.push("8".to_string());
-            }
-            if cell.attr.contains(Attr::STRIKETHROUGH) {
-                self.style_code_buffer.push("9".to_string());
-            }
-
-            if let Some(fg) = cell.fg() {
-                self.style_code_buffer.push(fg.to_ansi_fg());
-            }
-            if let Some(bg) = cell.bg() {
-                self.style_code_buffer.push(bg.to_ansi_bg());
-            }
-
-            if !self.style_code_buffer.is_empty() {
-                // Build ANSI sequence manually to avoid join() allocation
-                self.style_sequence_buf.clear();
-                for (i, code) in self.style_code_buffer.iter().enumerate() {
-                    if i > 0 {
-                        self.style_sequence_buf.push(';');
-                    }
-                    self.style_sequence_buf.push_str(code);
-                }
-                write!(self.buffer, "\x1b[{}m", self.style_sequence_buf)?;
-            }
-        }
-
-        self.last_emitted_attr = cell.attr;
-        self.last_emitted_fg = cell.fg();
-        self.last_emitted_bg = cell.bg();
 
         Ok(())
     }
@@ -784,71 +729,6 @@ impl Screen {
         Window::new(height, width, y, x)
     }
 
-    fn apply_style(&mut self) -> Result<()> {
-        // Performance optimization: only emit ANSI codes if style changed since last emission
-        let style_changed = self.current_attr != self.last_emitted_attr
-            || self.current_fg != self.last_emitted_fg
-            || self.current_bg != self.last_emitted_bg;
-
-        if !style_changed {
-            return Ok(());
-        }
-
-        // Performance optimization: reuse allocated buffer
-        self.style_code_buffer.clear();
-
-        // If any attribute changed, we need to reset and re-apply all
-        // (ANSI doesn't support selective attribute removal)
-        if self.current_attr != self.last_emitted_attr {
-            // Reset all attributes first
-            if self.last_emitted_attr != Attr::NORMAL {
-                self.style_code_buffer.push("0".to_string());
-            }
-
-            // Add current attribute codes
-            if !self.current_attr.is_empty() {
-                self.style_code_buffer.extend(
-                    self.current_attr
-                        .to_ansi_codes()
-                        .iter()
-                        .map(|s| s.to_string()),
-                );
-            }
-        }
-
-        // Add color codes if changed
-        if self.current_fg != self.last_emitted_fg {
-            if let Some(fg) = &self.current_fg {
-                self.style_code_buffer.push(fg.to_ansi_fg());
-            }
-        }
-        if self.current_bg != self.last_emitted_bg {
-            if let Some(bg) = &self.current_bg {
-                self.style_code_buffer.push(bg.to_ansi_bg());
-            }
-        }
-
-        if !self.style_code_buffer.is_empty() {
-            // Build ANSI sequence manually to avoid join() allocation
-            self.style_sequence_buf.clear();
-            for (i, code) in self.style_code_buffer.iter().enumerate() {
-                if i > 0 {
-                    self.style_sequence_buf.push(';');
-                }
-                self.style_sequence_buf.push_str(code);
-            }
-            write!(self.buffer, "\x1b[{}m", self.style_sequence_buf).map_err(|_| {
-                Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
-            })?;
-        }
-
-        // Update last emitted state
-        self.last_emitted_attr = self.current_attr;
-        self.last_emitted_fg = self.current_fg;
-        self.last_emitted_bg = self.current_bg;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]

@@ -22,50 +22,67 @@ pub enum Color {
 }
 
 impl Color {
-    pub(crate) fn to_ansi_fg(&self) -> String {
+    /// Write foreground ANSI code directly to a string buffer (zero-allocation for basic colors)
+    pub(crate) fn write_ansi_fg(&self, buf: &mut String) {
+        use std::fmt::Write;
         match self {
-            Color::Black => "30".to_string(),
-            Color::Red => "31".to_string(),
-            Color::Green => "32".to_string(),
-            Color::Yellow => "33".to_string(),
-            Color::Blue => "34".to_string(),
-            Color::Magenta => "35".to_string(),
-            Color::Cyan => "36".to_string(),
-            Color::White => "37".to_string(),
-            Color::BrightBlack => "90".to_string(),
-            Color::BrightRed => "91".to_string(),
-            Color::BrightGreen => "92".to_string(),
-            Color::BrightYellow => "93".to_string(),
-            Color::BrightBlue => "94".to_string(),
-            Color::BrightMagenta => "95".to_string(),
-            Color::BrightCyan => "96".to_string(),
-            Color::BrightWhite => "97".to_string(),
-            Color::Rgb(r, g, b) => format!("38;2;{};{};{}", r, g, b),
-            Color::Ansi256(c) => format!("38;5;{}", c),
+            Color::Black => buf.push_str("30"),
+            Color::Red => buf.push_str("31"),
+            Color::Green => buf.push_str("32"),
+            Color::Yellow => buf.push_str("33"),
+            Color::Blue => buf.push_str("34"),
+            Color::Magenta => buf.push_str("35"),
+            Color::Cyan => buf.push_str("36"),
+            Color::White => buf.push_str("37"),
+            Color::BrightBlack => buf.push_str("90"),
+            Color::BrightRed => buf.push_str("91"),
+            Color::BrightGreen => buf.push_str("92"),
+            Color::BrightYellow => buf.push_str("93"),
+            Color::BrightBlue => buf.push_str("94"),
+            Color::BrightMagenta => buf.push_str("95"),
+            Color::BrightCyan => buf.push_str("96"),
+            Color::BrightWhite => buf.push_str("97"),
+            Color::Rgb(r, g, b) => write!(buf, "38;2;{};{};{}", r, g, b).unwrap(),
+            Color::Ansi256(c) => write!(buf, "38;5;{}", c).unwrap(),
         }
     }
 
-    pub(crate) fn to_ansi_bg(&self) -> String {
+    /// Write background ANSI code directly to a string buffer (zero-allocation for basic colors)
+    pub(crate) fn write_ansi_bg(&self, buf: &mut String) {
+        use std::fmt::Write;
         match self {
-            Color::Black => "40".to_string(),
-            Color::Red => "41".to_string(),
-            Color::Green => "42".to_string(),
-            Color::Yellow => "43".to_string(),
-            Color::Blue => "44".to_string(),
-            Color::Magenta => "45".to_string(),
-            Color::Cyan => "46".to_string(),
-            Color::White => "47".to_string(),
-            Color::BrightBlack => "100".to_string(),
-            Color::BrightRed => "101".to_string(),
-            Color::BrightGreen => "102".to_string(),
-            Color::BrightYellow => "103".to_string(),
-            Color::BrightBlue => "104".to_string(),
-            Color::BrightMagenta => "105".to_string(),
-            Color::BrightCyan => "106".to_string(),
-            Color::BrightWhite => "107".to_string(),
-            Color::Rgb(r, g, b) => format!("48;2;{};{};{}", r, g, b),
-            Color::Ansi256(c) => format!("48;5;{}", c),
+            Color::Black => buf.push_str("40"),
+            Color::Red => buf.push_str("41"),
+            Color::Green => buf.push_str("42"),
+            Color::Yellow => buf.push_str("43"),
+            Color::Blue => buf.push_str("44"),
+            Color::Magenta => buf.push_str("45"),
+            Color::Cyan => buf.push_str("46"),
+            Color::White => buf.push_str("47"),
+            Color::BrightBlack => buf.push_str("100"),
+            Color::BrightRed => buf.push_str("101"),
+            Color::BrightGreen => buf.push_str("102"),
+            Color::BrightYellow => buf.push_str("103"),
+            Color::BrightBlue => buf.push_str("104"),
+            Color::BrightMagenta => buf.push_str("105"),
+            Color::BrightCyan => buf.push_str("106"),
+            Color::BrightWhite => buf.push_str("107"),
+            Color::Rgb(r, g, b) => write!(buf, "48;2;{};{};{}", r, g, b).unwrap(),
+            Color::Ansi256(c) => write!(buf, "48;5;{}", c).unwrap(),
         }
+    }
+
+    // Keep old methods for backward compatibility (used in tests and mosaic)
+    pub(crate) fn to_ansi_fg(&self) -> String {
+        let mut buf = String::with_capacity(16);
+        self.write_ansi_fg(&mut buf);
+        buf
+    }
+
+    pub(crate) fn to_ansi_bg(&self) -> String {
+        let mut buf = String::with_capacity(16);
+        self.write_ansi_bg(&mut buf);
+        buf
     }
 }
 
