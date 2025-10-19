@@ -424,8 +424,7 @@ pub extern "C" fn yellow_render_mosaic(
     unsafe {
         let slice = std::slice::from_raw_parts(data, data_len);
 
-        let config = crate::MosaicConfig::with_width(output_width)
-            .threshold(threshold);
+        let config = crate::MosaicConfig::with_width(output_width).threshold(threshold);
 
         let result = crate::render_mosaic(slice, width, height, &config);
 

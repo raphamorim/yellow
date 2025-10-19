@@ -21,6 +21,7 @@ mod attr;
 mod backend;
 mod cell;
 mod color;
+mod delta;
 mod error;
 mod image;
 mod input;

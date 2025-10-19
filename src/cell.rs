@@ -135,7 +135,12 @@ mod tests {
 
     #[test]
     fn test_cell_clone() {
-        let cell1 = Cell::with_style('X', Attr::BOLD | Attr::UNDERLINE, Some(Color::Green), Some(Color::Blue));
+        let cell1 = Cell::with_style(
+            'X',
+            Attr::BOLD | Attr::UNDERLINE,
+            Some(Color::Green),
+            Some(Color::Blue),
+        );
         let cell2 = cell1.clone();
 
         assert_eq!(cell1, cell2);
