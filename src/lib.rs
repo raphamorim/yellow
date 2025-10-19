@@ -27,6 +27,7 @@ mod image;
 mod input;
 mod kitty;
 mod mosaic;
+mod packed_color;
 mod panel;
 mod screen;
 mod window;
@@ -41,6 +42,7 @@ pub use acs::{
     AcsChar,
 };
 pub use attr::Attr;
+pub use cell::Cell;
 pub use color::{Color, ColorPair};
 pub use error::{Error, Result};
 pub use image::{ImageFormat, ImagePlacement, ImageProtocol, KittyImage, SixelImage};
@@ -50,3 +52,10 @@ pub use mosaic::{MosaicConfig, SymbolSet, render_mosaic};
 pub use panel::Panel;
 pub use screen::Screen;
 pub use window::Window;
+
+// Re-export internal modules for benchmarking purposes
+#[doc(hidden)]
+pub mod __bench {
+    pub use crate::cell::Cell;
+    pub use crate::delta::{DirtyRegion, find_line_diff, hash_line, detect_scrolls};
+}

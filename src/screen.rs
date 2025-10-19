@@ -429,8 +429,8 @@ impl Screen {
 
                             // Apply style if changed
                             let style_changed = cell.attr != self.last_emitted_attr
-                                || cell.fg != self.last_emitted_fg
-                                || cell.bg != self.last_emitted_bg;
+                                || cell.fg() != self.last_emitted_fg
+                                || cell.bg() != self.last_emitted_bg;
 
                             if style_changed {
                                 self.apply_style_for_cell(&cell)?;
@@ -439,8 +439,8 @@ impl Screen {
                             // Output character (with RLE optimization for spaces)
                             if cell.ch == ' '
                                 && cell.attr == Attr::NORMAL
-                                && cell.fg.is_none()
-                                && cell.bg.is_none()
+                                && cell.fg().is_none()
+                                && cell.bg().is_none()
                             {
                                 // Check for run of blank spaces
                                 let mut run_length = 1;
@@ -490,8 +490,8 @@ impl Screen {
     /// Apply style for a specific cell
     fn apply_style_for_cell(&mut self, cell: &Cell) -> Result<()> {
         if cell.attr == self.last_emitted_attr
-            && cell.fg == self.last_emitted_fg
-            && cell.bg == self.last_emitted_bg
+            && cell.fg() == self.last_emitted_fg
+            && cell.bg() == self.last_emitted_bg
         {
             return Ok(()); // Style unchanged
         }
@@ -499,7 +499,7 @@ impl Screen {
         self.style_code_buffer.clear();
 
         // Reset if needed
-        if cell.attr == Attr::NORMAL && cell.fg.is_none() && cell.bg.is_none() {
+        if cell.attr == Attr::NORMAL && cell.fg().is_none() && cell.bg().is_none() {
             write!(self.buffer, "\x1b[0m")?;
         } else {
             // Build SGR codes
@@ -528,10 +528,10 @@ impl Screen {
                 self.style_code_buffer.push("9".to_string());
             }
 
-            if let Some(fg) = &cell.fg {
+            if let Some(fg) = cell.fg() {
                 self.style_code_buffer.push(fg.to_ansi_fg());
             }
-            if let Some(bg) = &cell.bg {
+            if let Some(bg) = cell.bg() {
                 self.style_code_buffer.push(bg.to_ansi_bg());
             }
 
@@ -541,8 +541,8 @@ impl Screen {
         }
 
         self.last_emitted_attr = cell.attr;
-        self.last_emitted_fg = cell.fg;
-        self.last_emitted_bg = cell.bg;
+        self.last_emitted_fg = cell.fg();
+        self.last_emitted_bg = cell.bg();
 
         Ok(())
     }

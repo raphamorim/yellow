@@ -136,10 +136,10 @@ pub fn hash_line(cells: &[Cell]) -> u64 {
         hash = hash.wrapping_mul(31).wrapping_add(cell.attr.bits() as u64);
         hash = hash
             .wrapping_mul(31)
-            .wrapping_add(cell.fg.map(|c| hash_color(&c)).unwrap_or(0));
+            .wrapping_add(cell.fg().map(|c| hash_color(&c)).unwrap_or(0));
         hash = hash
             .wrapping_mul(31)
-            .wrapping_add(cell.bg.map(|c| hash_color(&c)).unwrap_or(0));
+            .wrapping_add(cell.bg().map(|c| hash_color(&c)).unwrap_or(0));
     }
     hash
 }
