@@ -19,6 +19,7 @@
 mod acs;
 mod attr;
 mod backend;
+mod cell;
 mod color;
 mod error;
 mod image;
