@@ -1,4 +1,4 @@
-.PHONY: all clean bindings lib zig-example help test
+.PHONY: all clean bindings lib zig-build-examples help test
 
 # Default target
 all: bindings zig-example
@@ -13,21 +13,16 @@ bindings: lib
 	@echo "C header generated at: bindings/h"
 
 # Build Zig examples
-zig-example: bindings zig-basic zig-mosaic
-
-zig-basic: bindings
-	@echo "Building Zig basic example..."
+zig-build-examples: bindings
+	@echo "Building Zig examples..."
 	@if ! command -v zig &> /dev/null; then \
 		echo "Error: zig not found. Please install Zig from https://ziglang.org/"; \
 		exit 1; \
 	fi
 	cd bindings/zig && zig build -Doptimize=ReleaseSafe
 
-zig-mosaic: zig-basic
-	@echo "Zig mosaic example built with basic example"
-
 # Run Zig basic example
-run-zig: zig-basic
+run-zig-example-basic: zig-build-examples
 	@echo "Running Zig basic example..."
 	@echo "Note: This requires a terminal (TTY). Run directly if make fails:"
 	@echo "  On macOS:   DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/basic"
@@ -39,17 +34,17 @@ run-zig: zig-basic
 		LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/basic; \
 	fi
 
-# Run Zig mosaic example
-run-zig-mosaic: zig-mosaic
-	@echo "Running Zig mosaic example..."
+# Run Zig colors-rgb example
+run-zig-example-colors: zig-build-examples
+	@echo "Running Zig colors-rgb example..."
 	@echo "Note: This requires a terminal (TTY). Run directly if make fails:"
-	@echo "  On macOS:   DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic"
-	@echo "  On Linux:   LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic"
+	@echo "  On macOS:   DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/colors-rgb"
+	@echo "  On Linux:   LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/colors-rgb"
 	@echo ""
 	@if [ "$(shell uname)" = "Darwin" ]; then \
-		DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic; \
+		DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/colors-rgb; \
 	else \
-		LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic; \
+		LD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/colors-rgb; \
 	fi
 
 # Run Rust tests
@@ -63,24 +58,3 @@ clean:
 	cargo clean
 	rm -rf bindings/zig/zig-out
 	rm -rf bindings/zig/.zig-cache
-
-# Display help
-help:
-	@echo "Library Bindings - Makefile targets:"
-	@echo ""
-	@echo "  make                - Build everything (lib + bindings + zig examples)"
-	@echo "  make lib            - Build the Rust library"
-	@echo "  make bindings       - Generate C header file"
-	@echo "  make zig-example    - Build all Zig examples"
-	@echo "  make zig-basic      - Build basic Zig example"
-	@echo "  make zig-mosaic     - Build mosaic Zig example"
-	@echo "  make run-zig        - Build and run basic Zig example"
-	@echo "  make run-zig-mosaic - Build and run mosaic Zig example"
-	@echo "  make test           - Run Rust tests"
-	@echo "  make clean          - Remove all build artifacts"
-	@echo "  make help           - Show this help message"
-	@echo ""
-	@echo "Requirements:"
-	@echo "  - Rust (cargo)"
-	@echo "  - Zig compiler (for building Zig examples)"
-	@echo ""

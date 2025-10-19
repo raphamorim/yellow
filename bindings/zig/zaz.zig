@@ -49,18 +49,16 @@ pub const Screen = opaque {
     }
 
     /// Print string at current cursor position
-    pub fn print(self: *Screen, text: []const u8) !void {
-        const c_str = @as([*c]const u8, @ptrCast(text.ptr));
-        const result = c.zaz_print(@ptrCast(self), c_str);
+    pub fn print(self: *Screen, text: [:0]const u8) !void {
+        const result = c.zaz_print(@ptrCast(self), text.ptr);
         if (result != 0) {
             return error.PrintFailed;
         }
     }
 
     /// Print string at position (y, x)
-    pub fn mvprint(self: *Screen, y: u16, x: u16, text: []const u8) !void {
-        const c_str = @as([*c]const u8, @ptrCast(text.ptr));
-        const result = c.zaz_mvprint(@ptrCast(self), y, x, c_str);
+    pub fn mvprint(self: *Screen, y: u16, x: u16, text: [:0]const u8) !void {
+        const result = c.zaz_mvprint(@ptrCast(self), y, x, text.ptr);
         if (result != 0) {
             return error.MvprintFailed;
         }

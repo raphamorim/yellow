@@ -189,8 +189,8 @@ pub fn main() !void {
         if (fps_widget.fps) |fps| {
             try screen.attrOn(.bold);
             try screen.setFgColor(100, 200, 255);
-            var fps_buf: [32]u8 = undefined;
-            const fps_text = try std.fmt.bufPrint(&fps_buf, "FPS: {d:.1}", .{fps});
+            var fps_buf: [32:0]u8 = undefined;
+            const fps_text = try std.fmt.bufPrintZ(&fps_buf, "FPS: {d:.1}", .{fps});
             try screen.mvprint(0, 0, fps_text);
             try screen.attrOff(.bold);
             try screen.setFgColor(255, 255, 255);

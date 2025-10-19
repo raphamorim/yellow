@@ -20,8 +20,8 @@ pub fn main() !void {
 
     // Get terminal size
     const size = screen.getSize();
-    var buf: [100]u8 = undefined;
-    const msg = try std.fmt.bufPrint(&buf, "Terminal size: {}x{}", .{ size.height, size.width });
+    var buf: [100:0]u8 = undefined;
+    const msg = try std.fmt.bufPrintZ(&buf, "Terminal size: {}x{}", .{ size.height, size.width });
     try screen.mvprint(6, 4, msg);
 
     // Instructions
