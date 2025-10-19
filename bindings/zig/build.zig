@@ -23,21 +23,24 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    basic_exe.root_module.addImport("zaz", zaz_mod);
     basic_exe.addIncludePath(.{ .cwd_relative = "." });
     basic_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
     basic_exe.linkSystemLibrary("zaz");
     basic_exe.linkLibC();
     b.installArtifact(basic_exe);
 
-    // Colors RGB example
+    // Colors RGB example module
+    const colors_mod = b.createModule(.{
+        .root_source_file = b.path("examples/colors-rgb.zig"),
+    });
+    colors_mod.addImport("zaz", zaz_mod);
+
     const colors_exe = b.addExecutable(.{
         .name = "colors-rgb",
-        .root_source_file = b.path("examples/colors-rgb.zig"),
+        .root_module = colors_mod,
         .target = target,
         .optimize = optimize,
     });
-    colors_exe.root_module.addImport("zaz", zaz_mod);
     colors_exe.addIncludePath(.{ .cwd_relative = "." });
     colors_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
     colors_exe.linkSystemLibrary("zaz");
