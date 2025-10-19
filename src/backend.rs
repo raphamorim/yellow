@@ -77,6 +77,13 @@ impl Backend {
     #[cfg(unix)]
     fn enable_raw_mode(&mut self) -> Result<()> {
         let fd = io::stdin().as_raw_fd();
+
+        // Check if stdin is a TTY
+        if unsafe { libc::isatty(fd) } == 0 {
+            // Not a TTY - skip raw mode setup
+            return Ok(());
+        }
+
         let mut termios = unsafe {
             let mut termios: libc::termios = std::mem::zeroed();
             if libc::tcgetattr(fd, &mut termios) != 0 {
@@ -245,6 +252,14 @@ impl Backend {
         #[cfg(unix)]
         {
             let fd = io::stdout().as_raw_fd();
+
+            // Check if stdout is a TTY
+            if unsafe { libc::isatty(fd) } == 0 {
+                // Not a TTY - return a default size or error
+                // For now, return a reasonable default size (24x80 is classic terminal size)
+                return Ok((24, 80));
+            }
+
             let mut winsize: libc::winsize = unsafe { std::mem::zeroed() };
 
             unsafe {
