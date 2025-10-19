@@ -24,3 +24,20 @@ libc = "0.2"
 
 [dev-dependencies]
 image = "0.25"
+criterion = "0.5"
+
+[[bench]]
+name = "cell_benchmarks"
+harness = false
+
+[[bench]]
+name = "delta_benchmarks"
+harness = false
+
+[[bench]]
+name = "screen_benchmarks"
+harness = false
+
+[[bench]]
+name = "hash_benchmarks"
+harness = false

@@ -11,6 +11,7 @@ Zaz's mosaic demo with Zig wrapper
 ## Features
 
 - Effiecient terminal rendering (Smart Style Caching, Paul Heckel's Diff Algorithm, Cost-based Cursor Movement, etc...)
+- SIMD-Accelerated Line Comparison
 - Terminal initialization and screen management
 - Cursor positioning and text output
 - RGB color support with ANSI escape codes
@@ -20,36 +21,6 @@ Zaz's mosaic demo with Zig wrapper
 - Graphics support (Kitty image protocol, Sixel)
 - Unicode block mosaic rendering from images
 - Scrolling regions
-
-## C FFI API
-
-The library exports a C-compatible API for use with other languages:
-
-### Screen Management
-- `zaz_init()` - Initialize screen
-- `zaz_endwin()` - Clean up and restore terminal
-- `zaz_clear()` - Clear screen
-- `zaz_refresh()` - Refresh display
-
-### Output
-- `zaz_print()` - Print at cursor position
-- `zaz_mvprint()` - Print at specific position
-- `zaz_move_cursor()` - Move cursor
-
-### Colors and Attributes
-- `zaz_set_fg_color()` - Set foreground RGB color
-- `zaz_set_bg_color()` - Set background RGB color
-- `zaz_attron()` - Enable text attributes
-- `zaz_attroff()` - Disable text attributes
-
-### Input
-- `zaz_getch()` - Get key input
-
-### Utilities
-- `zaz_get_size()` - Get terminal dimensions
-- `zaz_render_mosaic()` - Render image as Unicode art
-- `zaz_free_string()` - Free mosaic string
-
 
 ## Installation
 
@@ -189,6 +160,35 @@ DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic
 ```
 
 On Linux, use `LD_LIBRARY_PATH` instead of `DYLD_LIBRARY_PATH`.
+
+## C FFI API
+
+The library exports a C-compatible API for use with other languages:
+
+### Screen Management
+- `zaz_init()` - Initialize screen
+- `zaz_endwin()` - Clean up and restore terminal
+- `zaz_clear()` - Clear screen
+- `zaz_refresh()` - Refresh display
+
+### Output
+- `zaz_print()` - Print at cursor position
+- `zaz_mvprint()` - Print at specific position
+- `zaz_move_cursor()` - Move cursor
+
+### Colors and Attributes
+- `zaz_set_fg_color()` - Set foreground RGB color
+- `zaz_set_bg_color()` - Set background RGB color
+- `zaz_attron()` - Enable text attributes
+- `zaz_attroff()` - Disable text attributes
+
+### Input
+- `zaz_getch()` - Get key input
+
+### Utilities
+- `zaz_get_size()` - Get terminal dimensions
+- `zaz_render_mosaic()` - Render image as Unicode art
+- `zaz_free_string()` - Free mosaic string
 
 ## License
 
