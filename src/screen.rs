@@ -8,7 +8,6 @@ use crate::input::Key;
 use crate::window::Window;
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::io;
 
 /// Main screen interface
 pub struct Screen {
@@ -28,6 +27,8 @@ pub struct Screen {
     last_emitted_bg: Option<Color>,
     // Performance optimization: reuse style code buffer to avoid allocations
     style_code_buffer: Vec<String>,
+    // Performance optimization: pre-allocated buffer for ANSI sequence building
+    style_sequence_buf: String,
     // Performance optimization: double-buffering for delta updates
     current_content: Vec<Vec<Cell>>,
     pending_content: Vec<Vec<Cell>>,
@@ -71,6 +72,7 @@ impl Screen {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::with_capacity(5), // Pre-allocate for typical usage
+            style_sequence_buf: String::with_capacity(50), // Pre-allocated for ANSI sequences
             current_content,
             pending_content,
             dirty_lines,
@@ -480,9 +482,8 @@ impl Screen {
         }
         self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
 
-        // Flush to terminal
-        io::stdout().write_all(self.buffer.as_bytes())?;
-        io::stdout().flush()?;
+        // Flush to terminal using direct I/O (single syscall, no buffering)
+        crate::platform_io::write_all_stdout(self.buffer.as_bytes())?;
 
         Ok(())
     }
@@ -536,7 +537,15 @@ impl Screen {
             }
 
             if !self.style_code_buffer.is_empty() {
-                write!(self.buffer, "\x1b[{}m", self.style_code_buffer.join(";"))?;
+                // Build ANSI sequence manually to avoid join() allocation
+                self.style_sequence_buf.clear();
+                for (i, code) in self.style_code_buffer.iter().enumerate() {
+                    if i > 0 {
+                        self.style_sequence_buf.push(';');
+                    }
+                    self.style_sequence_buf.push_str(code);
+                }
+                write!(self.buffer, "\x1b[{}m", self.style_sequence_buf)?;
             }
         }
 
@@ -676,7 +685,15 @@ impl Screen {
         }
 
         if !self.style_code_buffer.is_empty() {
-            write!(self.buffer, "\x1b[{}m", self.style_code_buffer.join(";")).map_err(|_| {
+            // Build ANSI sequence manually to avoid join() allocation
+            self.style_sequence_buf.clear();
+            for (i, code) in self.style_code_buffer.iter().enumerate() {
+                if i > 0 {
+                    self.style_sequence_buf.push(';');
+                }
+                self.style_sequence_buf.push_str(code);
+            }
+            write!(self.buffer, "\x1b[{}m", self.style_sequence_buf).map_err(|_| {
                 Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
             })?;
         }
@@ -713,6 +730,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             pending_content: vec![vec![Cell::blank(); cols as usize]; rows as usize],
             dirty_lines: vec![DirtyRegion::clean(); rows as usize],
@@ -977,6 +995,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
@@ -1011,6 +1030,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             current_content: vec![vec![Cell::blank(); 80]; 24],
             pending_content: vec![vec![Cell::blank(); 80]; 24],
             dirty_lines: vec![DirtyRegion::clean(); 24],
@@ -1037,6 +1057,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1073,6 +1094,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1104,6 +1126,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1135,6 +1158,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1166,6 +1190,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1197,6 +1222,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1228,6 +1254,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1259,6 +1286,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::new(),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],
@@ -1363,6 +1391,7 @@ mod tests {
             last_emitted_fg: None,
             last_emitted_bg: None,
             style_code_buffer: Vec::with_capacity(5),
+            style_sequence_buf: String::new(),
             rows: 24,
             cols: 80,
             current_content: vec![vec![Cell::blank(); 80]; 24],

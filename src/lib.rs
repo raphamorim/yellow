@@ -29,6 +29,7 @@ mod kitty;
 mod mosaic;
 mod packed_color;
 mod panel;
+mod platform_io;
 mod screen;
 mod window;
 
@@ -58,4 +59,10 @@ pub use window::Window;
 pub mod __bench {
     pub use crate::cell::Cell;
     pub use crate::delta::{DirtyRegion, find_line_diff, hash_line, detect_scrolls};
+}
+
+// Re-export I/O functions for benchmarking
+#[doc(hidden)]
+pub mod __bench_io {
+    pub use crate::platform_io::{write_stdout, write_all_stdout};
 }
