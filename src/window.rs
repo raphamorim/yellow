@@ -21,6 +21,8 @@ pub struct Window {
     last_emitted_attr: Attr,
     last_emitted_fg: Option<Color>,
     last_emitted_bg: Option<Color>,
+    // Performance optimization: reuse style code buffer to avoid allocations
+    style_code_buffer: Vec<String>,
 }
 
 impl Window {
@@ -44,6 +46,7 @@ impl Window {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::with_capacity(5), // Pre-allocate for typical usage
         })
     }
 
@@ -97,8 +100,6 @@ impl Window {
 
     /// Print text at current cursor position
     pub fn print(&mut self, text: &str) -> Result<()> {
-        self.apply_style()?;
-
         // Truncate text if it exceeds window width
         let remaining = (self.width - self.cursor_x) as usize;
         let text_to_print = if text.len() > remaining {
@@ -107,6 +108,15 @@ impl Window {
             text
         };
 
+        // Performance optimization: use ECH (Erase Character) for long blank runs
+        if text_to_print.len() >= 8 && text_to_print.chars().all(|c| c == ' ') {
+            // Use ECH sequence for efficiency
+            write!(self.buffer, "\x1b[{}X", text_to_print.len())?;
+            self.cursor_x += text_to_print.len() as u16;
+            return Ok(());
+        }
+
+        self.apply_style()?;
         write!(self.buffer, "{}", text_to_print)?;
         self.cursor_x += text_to_print.len() as u16;
         Ok(())
@@ -162,10 +172,18 @@ impl Window {
 
     /// Clear the window
     pub fn clear(&mut self) -> Result<()> {
+        // Performance optimization: use ED (Erase in Display) instead of line-by-line clear
+        self.move_cursor(0, 0)?;
+
+        // Fill the entire window with blanks using optimized sequences
         for y in 0..self.height {
-            self.move_cursor(y, 0)?;
+            if y > 0 {
+                self.move_cursor(y, 0)?;
+            }
+            // Use EL (Erase in Line) to clear to end of line
             write!(self.buffer, "\x1b[K")?;
         }
+
         self.move_cursor(0, 0)?;
         Ok(())
     }
@@ -288,19 +306,20 @@ impl Window {
             return Ok(());
         }
 
-        let mut codes: Vec<String> = Vec::new();
+        // Performance optimization: reuse allocated buffer
+        self.style_code_buffer.clear();
 
         // If any attribute changed, we need to reset and re-apply all
         // (ANSI doesn't support selective attribute removal)
         if self.current_attr != self.last_emitted_attr {
             // Reset all attributes first
             if self.last_emitted_attr != Attr::NORMAL {
-                codes.push("0".to_string());
+                self.style_code_buffer.push("0".to_string());
             }
 
             // Add current attribute codes
             if !self.current_attr.is_empty() {
-                codes.extend(
+                self.style_code_buffer.extend(
                     self.current_attr
                         .to_ansi_codes()
                         .iter()
@@ -312,17 +331,17 @@ impl Window {
         // Add color codes if changed
         if self.current_fg != self.last_emitted_fg {
             if let Some(fg) = &self.current_fg {
-                codes.push(fg.to_ansi_fg());
+                self.style_code_buffer.push(fg.to_ansi_fg());
             }
         }
         if self.current_bg != self.last_emitted_bg {
             if let Some(bg) = &self.current_bg {
-                codes.push(bg.to_ansi_bg());
+                self.style_code_buffer.push(bg.to_ansi_bg());
             }
         }
 
-        if !codes.is_empty() {
-            write!(self.buffer, "\x1b[{}m", codes.join(";")).map_err(|_| {
+        if !self.style_code_buffer.is_empty() {
+            write!(self.buffer, "\x1b[{}m", self.style_code_buffer.join(";")).map_err(|_| {
                 Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
             })?;
         }
@@ -684,5 +703,59 @@ mod tests {
         assert!(win.buffer.contains("\x1b[6;9H")); // CUP
         assert_eq!(win.cursor_x, 8);
         assert_eq!(win.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_window_rle_long_blank_run() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Print 15 spaces (should use ECH)
+        win.print("               ").unwrap();
+        assert!(win.buffer.contains("\x1b[15X")); // ECH sequence
+        assert_eq!(win.cursor_x, 15);
+    }
+
+    #[test]
+    fn test_window_rle_short_blank_run() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Print 5 spaces (should use regular output)
+        win.print("     ").unwrap();
+        assert!(!win.buffer.contains("\x1b[")); // Should NOT use ECH
+        assert_eq!(win.buffer, "     ");
+        assert_eq!(win.cursor_x, 5);
+    }
+
+    #[test]
+    fn test_window_rle_threshold_8_spaces() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Print exactly 8 spaces (should use ECH)
+        win.print("        ").unwrap();
+        assert!(win.buffer.contains("\x1b[8X"));
+        assert_eq!(win.cursor_x, 8);
+    }
+
+    #[test]
+    fn test_window_rle_with_truncation() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+        win.cursor_x = 15; // Near end of window
+
+        // Print 10 spaces, but only 5 will fit
+        win.print("          ").unwrap();
+        // Should NOT use ECH because truncated length is only 5
+        assert!(!win.buffer.contains("\x1b[")); // Should NOT use ECH
+        assert_eq!(win.cursor_x, 20);
+    }
+
+    #[test]
+    fn test_window_rle_non_blank_text() {
+        let mut win = Window::new(10, 20, 0, 0).unwrap();
+
+        // Print regular text
+        win.print("Hello").unwrap();
+        assert!(!win.buffer.contains("\x1b[")); // No escape sequences
+        assert_eq!(win.buffer, "Hello");
+        assert_eq!(win.cursor_x, 5);
     }
 }

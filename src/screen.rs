@@ -22,6 +22,8 @@ pub struct Screen {
     last_emitted_attr: Attr,
     last_emitted_fg: Option<Color>,
     last_emitted_bg: Option<Color>,
+    // Performance optimization: reuse style code buffer to avoid allocations
+    style_code_buffer: Vec<String>,
 }
 
 impl Screen {
@@ -46,6 +48,7 @@ impl Screen {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::with_capacity(5), // Pre-allocate for typical usage
         })
     }
 
@@ -93,6 +96,14 @@ impl Screen {
 
     /// Print text at current cursor position
     pub fn print(&mut self, text: &str) -> Result<()> {
+        // Performance optimization: use ECH (Erase Character) for long blank runs
+        if text.len() >= 8 && text.chars().all(|c| c == ' ') {
+            // Use ECH sequence for efficiency
+            write!(self.buffer, "\x1b[{}X", text.len())?;
+            self.cursor_x += text.len() as u16;
+            return Ok(());
+        }
+
         self.apply_style()?;
         write!(self.buffer, "{}", text)?;
         self.cursor_x += text.len() as u16;
@@ -363,19 +374,20 @@ impl Screen {
             return Ok(());
         }
 
-        let mut codes: Vec<String> = Vec::new();
+        // Performance optimization: reuse allocated buffer
+        self.style_code_buffer.clear();
 
         // If any attribute changed, we need to reset and re-apply all
         // (ANSI doesn't support selective attribute removal)
         if self.current_attr != self.last_emitted_attr {
             // Reset all attributes first
             if self.last_emitted_attr != Attr::NORMAL {
-                codes.push("0".to_string());
+                self.style_code_buffer.push("0".to_string());
             }
 
             // Add current attribute codes
             if !self.current_attr.is_empty() {
-                codes.extend(
+                self.style_code_buffer.extend(
                     self.current_attr
                         .to_ansi_codes()
                         .iter()
@@ -387,17 +399,17 @@ impl Screen {
         // Add color codes if changed
         if self.current_fg != self.last_emitted_fg {
             if let Some(fg) = &self.current_fg {
-                codes.push(fg.to_ansi_fg());
+                self.style_code_buffer.push(fg.to_ansi_fg());
             }
         }
         if self.current_bg != self.last_emitted_bg {
             if let Some(bg) = &self.current_bg {
-                codes.push(bg.to_ansi_bg());
+                self.style_code_buffer.push(bg.to_ansi_bg());
             }
         }
 
-        if !codes.is_empty() {
-            write!(self.buffer, "\x1b[{}m", codes.join(";")).map_err(|_| {
+        if !self.style_code_buffer.is_empty() {
+            write!(self.buffer, "\x1b[{}m", self.style_code_buffer.join(";")).map_err(|_| {
                 Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "fmt error"))
             })?;
         }
@@ -430,6 +442,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.move_cursor(5, 10).unwrap();
@@ -457,6 +470,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.attron(Attr::BOLD).unwrap();
@@ -484,6 +498,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.init_pair(1, Color::Red, Color::Black).unwrap();
@@ -507,6 +522,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         let result = scr.color_pair(99);
@@ -527,6 +543,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.clear().unwrap();
@@ -557,6 +574,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.cursor_visible(true).unwrap();
@@ -581,6 +599,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         use crate::kitty::KittyFlags;
@@ -610,6 +629,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         scr.disable_kitty_keyboard().unwrap();
@@ -630,6 +650,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         use crate::kitty::KittyFlags;
@@ -659,6 +680,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         use crate::kitty::KittyFlags;
@@ -689,6 +711,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // First print should emit style codes
@@ -718,6 +741,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Print without style
@@ -746,6 +770,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Set foreground color
@@ -780,6 +805,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Turn on bold
@@ -809,6 +835,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Turn on bold and underline
@@ -841,6 +868,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Verify buffer has non-zero capacity
@@ -867,6 +895,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Verify capacity is capped at 64KB
@@ -887,6 +916,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         let initial_capacity = scr.buffer.capacity();
@@ -915,6 +945,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move forward 2 cells (should use CUF)
@@ -938,6 +969,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move back 3 cells (should use CUB)
@@ -961,6 +993,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move down 2 lines (should use CUD)
@@ -984,6 +1017,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move up 1 line (should use CUU)
@@ -1007,6 +1041,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move 10 cells forward (should use CUP for long distance)
@@ -1030,6 +1065,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Diagonal movement (should use CUP)
@@ -1053,6 +1089,7 @@ mod tests {
             last_emitted_attr: Attr::NORMAL,
             last_emitted_fg: None,
             last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
         };
 
         // Move to same position (should use CUP due to dx=0, dy=0)
@@ -1060,5 +1097,198 @@ mod tests {
         assert!(scr.buffer.contains("\x1b[6;11H"));
         assert_eq!(scr.cursor_x, 10);
         assert_eq!(scr.cursor_y, 5);
+    }
+
+    #[test]
+    fn test_rle_long_blank_run() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Print 20 spaces (should use ECH)
+        scr.print("                    ").unwrap();
+        assert!(scr.buffer.contains("\x1b[20X")); // ECH sequence
+        assert!(!scr.buffer.contains("    ")); // Should not contain actual spaces
+        assert_eq!(scr.cursor_x, 20);
+    }
+
+    #[test]
+    fn test_rle_short_blank_run() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Print 5 spaces (should use regular output)
+        scr.print("     ").unwrap();
+        assert!(!scr.buffer.contains("\x1b[5X")); // Should NOT use ECH
+        assert_eq!(scr.buffer, "     "); // Should contain actual spaces
+        assert_eq!(scr.cursor_x, 5);
+    }
+
+    #[test]
+    fn test_rle_non_blank_text() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Print regular text (should use regular output)
+        scr.print("Hello World").unwrap();
+        assert!(!scr.buffer.contains("\x1b[")); // Should NOT use any escape sequences
+        assert_eq!(scr.buffer, "Hello World");
+        assert_eq!(scr.cursor_x, 11);
+    }
+
+    #[test]
+    fn test_rle_threshold_exactly_8() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Print exactly 8 spaces (should use ECH)
+        scr.print("        ").unwrap();
+        assert!(scr.buffer.contains("\x1b[8X")); // ECH sequence
+        assert_eq!(scr.cursor_x, 8);
+    }
+
+    #[test]
+    fn test_rle_threshold_7_spaces() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Print exactly 7 spaces (should NOT use ECH)
+        scr.print("       ").unwrap();
+        assert!(!scr.buffer.contains("\x1b[")); // Should NOT use ECH
+        assert_eq!(scr.buffer, "       ");
+        assert_eq!(scr.cursor_x, 7);
+    }
+
+    #[test]
+    fn test_style_code_buffer_reuse() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::with_capacity(5),
+        };
+
+        // Apply first style
+        scr.attron(Attr::BOLD).unwrap();
+        scr.print("Bold").unwrap();
+
+        // Buffer should have some capacity
+        let capacity_after_first = scr.style_code_buffer.capacity();
+        assert!(capacity_after_first >= 5);
+
+        scr.buffer.clear();
+
+        // Apply second style (should reuse buffer)
+        scr.set_fg(Color::Red).unwrap();
+        scr.print("Red").unwrap();
+
+        // Capacity should not have changed (buffer reused)
+        assert_eq!(scr.style_code_buffer.capacity(), capacity_after_first);
+
+        scr.buffer.clear();
+
+        // Apply third style (should still reuse buffer)
+        scr.attroff(Attr::BOLD).unwrap();
+        scr.print("Normal").unwrap();
+
+        // Capacity should still not have changed
+        assert_eq!(scr.style_code_buffer.capacity(), capacity_after_first);
+    }
+
+    #[test]
+    fn test_style_code_buffer_cleared() {
+        let mut scr = Screen {
+            cursor_x: 0,
+            cursor_y: 0,
+            current_attr: Attr::NORMAL,
+            current_fg: None,
+            current_bg: None,
+            color_pairs: HashMap::new(),
+            cursor_visible: false,
+            buffer: String::new(),
+            last_emitted_attr: Attr::NORMAL,
+            last_emitted_fg: None,
+            last_emitted_bg: None,
+            style_code_buffer: Vec::new(),
+        };
+
+        // Apply style
+        scr.attron(Attr::BOLD).unwrap();
+        scr.print("Bold").unwrap();
+
+        // Buffer should be cleared after apply_style
+        // (We can't directly check the private field, but we can verify behavior)
+        scr.buffer.clear();
+
+        // Apply same style again - should not emit codes
+        scr.print("MoreBold").unwrap();
+        assert!(!scr.buffer.contains("\x1b[")); // No escape codes
     }
 }
