@@ -36,6 +36,11 @@ pub struct Screen {
     // Performance optimization: line hash cache for scroll detection
     current_line_hashes: Vec<u64>,
     pending_line_hashes: Vec<u64>,
+    // Performance optimization: interrupt-driven refresh
+    #[cfg(unix)]
+    stdin_fd: std::os::unix::io::RawFd,
+    check_interval: usize,
+    fifo_hold: bool,
 }
 
 impl Screen {
@@ -78,6 +83,10 @@ impl Screen {
             dirty_lines,
             current_line_hashes,
             pending_line_hashes,
+            #[cfg(unix)]
+            stdin_fd: 0, // Standard input file descriptor
+            check_interval: 5, // Check for input every 5 lines (default)
+            fifo_hold: false, // Allow input checking by default
         })
     }
 
@@ -375,6 +384,66 @@ impl Screen {
         Backend::read_key_timeout(Some(timeout_ms))
     }
 
+    /// Set how often to check for input during refresh (Phase 2.1 optimization)
+    ///
+    /// Lower values = more responsive but slightly more CPU overhead
+    /// Higher values = less overhead but potential input lag
+    ///
+    /// Default: 5 lines
+    pub fn set_check_interval(&mut self, lines: usize) {
+        self.check_interval = lines.max(1); // At least 1
+    }
+
+    /// Temporarily disable input checking during critical updates
+    ///
+    /// Use when you need a consistent screen state without interruption
+    pub fn hold_refresh(&mut self) {
+        self.fifo_hold = true;
+    }
+
+    /// Re-enable input checking during refresh
+    pub fn release_refresh(&mut self) {
+        self.fifo_hold = false;
+    }
+
+    /// Check if input is pending (non-blocking)
+    ///
+    /// Returns true if stdin has data available to read
+    #[cfg(unix)]
+    fn check_pending_input(&self) -> Result<bool> {
+        use libc::{poll, pollfd, POLLIN};
+
+        if self.fifo_hold {
+            return Ok(false);
+        }
+
+        let mut fds = [pollfd {
+            fd: self.stdin_fd,
+            events: POLLIN,
+            revents: 0,
+        }];
+
+        // Non-blocking poll (0 timeout)
+        let result = unsafe { poll(fds.as_mut_ptr(), 1, 0) };
+
+        if result < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::Interrupted {
+                return Ok(false); // EINTR - treat as no input
+            }
+            return Err(Error::Io(err));
+        }
+
+        // Check if input is available
+        Ok(result > 0 && (fds[0].revents & POLLIN) != 0)
+    }
+
+    #[cfg(not(unix))]
+    fn check_pending_input(&self) -> Result<bool> {
+        // Non-Unix platforms: always continue (could implement platform-specific later)
+        Ok(false)
+    }
+
     /// Refresh the screen (flush buffer to stdout)
     pub fn refresh(&mut self) -> Result<()> {
         use std::io::Write as IoWrite;
@@ -408,7 +477,10 @@ impl Screen {
             }
         }
 
-        // Process each dirty line
+        // Process each dirty line (with interrupt checking)
+        let mut lines_processed = 0;
+        let mut refresh_aborted = false;
+
         for y in 0..self.rows as usize {
             if let Some((first_x, last_x)) = self.dirty_lines[y].range() {
                 // Find actual differences within dirty region
@@ -426,16 +498,73 @@ impl Screen {
                         // Output changed cells
                         let mut x = first;
                         while x <= last {
-                            // Clone cell to avoid borrow checker issues
-                            let cell = self.pending_content[y][x].clone();
+                            let cell = &self.pending_content[y][x];
 
-                            // Apply style if changed
+                            // Check if style needs updating
                             let style_changed = cell.attr != self.last_emitted_attr
                                 || cell.fg() != self.last_emitted_fg
                                 || cell.bg() != self.last_emitted_bg;
 
+                            // Apply style if changed
                             if style_changed {
-                                self.apply_style_for_cell(&cell)?;
+                                // Extract style data before mutable borrow
+                                let cell_style = (cell.attr, cell.fg(), cell.bg());
+                                self.last_emitted_attr = cell_style.0;
+                                self.last_emitted_fg = cell_style.1;
+                                self.last_emitted_bg = cell_style.2;
+
+                                // Build and emit style codes
+                                self.style_code_buffer.clear();
+
+                                // Add attribute codes
+                                if cell_style.0.is_empty() {
+                                    self.style_code_buffer.push("0".to_string()); // Reset
+                                } else {
+                                    if cell_style.0.contains(Attr::BOLD) {
+                                        self.style_code_buffer.push("1".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::DIM) {
+                                        self.style_code_buffer.push("2".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::ITALIC) {
+                                        self.style_code_buffer.push("3".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::UNDERLINE) {
+                                        self.style_code_buffer.push("4".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::BLINK) {
+                                        self.style_code_buffer.push("5".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::REVERSE) {
+                                        self.style_code_buffer.push("7".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::HIDDEN) {
+                                        self.style_code_buffer.push("8".to_string());
+                                    }
+                                    if cell_style.0.contains(Attr::STRIKETHROUGH) {
+                                        self.style_code_buffer.push("9".to_string());
+                                    }
+                                }
+
+                                // Add color codes
+                                if let Some(fg) = cell_style.1 {
+                                    self.style_code_buffer.push(fg.to_ansi_fg());
+                                }
+                                if let Some(bg) = cell_style.2 {
+                                    self.style_code_buffer.push(bg.to_ansi_bg());
+                                }
+
+                                // Emit ANSI sequence
+                                if !self.style_code_buffer.is_empty() {
+                                    self.style_sequence_buf.clear();
+                                    for (i, code) in self.style_code_buffer.iter().enumerate() {
+                                        if i > 0 {
+                                            self.style_sequence_buf.push(';');
+                                        }
+                                        self.style_sequence_buf.push_str(code);
+                                    }
+                                    write!(self.buffer, "\x1b[{}m", self.style_sequence_buf)?;
+                                }
                             }
 
                             // Output character (with RLE optimization for spaces)
@@ -467,23 +596,38 @@ impl Screen {
                     }
                 }
 
-                // Clear dirty flag
-                self.dirty_lines[y] = DirtyRegion::clean();
+                // Clear dirty flag only if not aborted
+                if !refresh_aborted {
+                    self.dirty_lines[y] = DirtyRegion::clean();
+                }
+
+                lines_processed += 1;
+
+                // Check for input every check_interval lines (Phase 2.1 optimization)
+                if lines_processed % self.check_interval == 0 {
+                    if self.check_pending_input()? {
+                        // Input detected - abort refresh, preserve dirty flags for unprocessed lines
+                        refresh_aborted = true;
+                        break;
+                    }
+                }
             }
         }
 
-        // Swap buffers (current becomes what we just rendered)
-        std::mem::swap(&mut self.current_content, &mut self.pending_content);
-        std::mem::swap(&mut self.current_line_hashes, &mut self.pending_line_hashes);
-
-        // Copy back to pending (pending should match current after refresh)
-        for y in 0..self.rows as usize {
-            self.pending_content[y].clone_from_slice(&self.current_content[y]);
-        }
-        self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
-
-        // Flush to terminal using direct I/O (single syscall, no buffering)
+        // Flush buffer even if aborted (partial update is valid)
         crate::platform_io::write_all_stdout(self.buffer.as_bytes())?;
+
+        // Swap buffers only if refresh completed (not aborted)
+        if !refresh_aborted {
+            std::mem::swap(&mut self.current_content, &mut self.pending_content);
+            std::mem::swap(&mut self.current_line_hashes, &mut self.pending_line_hashes);
+
+            // Copy back to pending (pending should match current after refresh)
+            for y in 0..self.rows as usize {
+                self.pending_content[y].clone_from_slice(&self.current_content[y]);
+            }
+            self.pending_line_hashes.copy_from_slice(&self.current_line_hashes);
+        }
 
         Ok(())
     }
@@ -736,6 +880,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); rows as usize],
             current_line_hashes: vec![0u64; rows as usize],
             pending_line_hashes: vec![0u64; rows as usize],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         }
     }
 
@@ -1001,6 +1149,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Verify buffer has non-zero capacity
@@ -1036,6 +1188,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Verify capacity is capped at 64KB
@@ -1065,6 +1221,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         let initial_capacity = scr.buffer.capacity();
@@ -1102,6 +1262,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move forward 2 cells (should use CUF)
@@ -1134,6 +1298,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move back 3 cells (should use CUB)
@@ -1166,6 +1334,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move down 2 lines (should use CUD)
@@ -1198,6 +1370,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move up 1 line (should use CUU)
@@ -1230,6 +1406,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move 10 cells forward (should use CUP for long distance)
@@ -1262,6 +1442,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Diagonal movement (should use CUP)
@@ -1294,6 +1478,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Move to same position (should use CUP due to dx=0, dy=0)
@@ -1399,6 +1587,10 @@ mod tests {
             dirty_lines: vec![DirtyRegion::clean(); 24],
                     current_line_hashes: vec![0u64; 24],
             pending_line_hashes: vec![0u64; 24],
+            #[cfg(unix)]
+            stdin_fd: 0,
+            check_interval: 5,
+            fifo_hold: false,
         };
 
         // Apply first style
