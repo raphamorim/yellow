@@ -64,6 +64,8 @@ zaz = "*"
 
 ### Zig
 
+> TODO: I will improve this flow eventually.
+
 To use Zaz in your Zig project:
 
 1. Build the Zaz library:
@@ -158,26 +160,6 @@ pub fn main() !void {
 }
 ```
 
-## Building
-
-### Build Rust Library
-
-```bash
-cargo build --release
-```
-
-### Build Zig Bindings
-
-```bash
-make zig-example
-```
-
-Or build everything at once:
-
-```bash
-make
-```
-
 ## Running Examples
 
 ### Rust Examples
@@ -207,33 +189,6 @@ DYLD_LIBRARY_PATH=target/release ./bindings/zig/zig-out/bin/mosaic
 ```
 
 On Linux, use `LD_LIBRARY_PATH` instead of `DYLD_LIBRARY_PATH`.
-
-## Mosaic Rendering
-
-Zaz includes a mosaic module that converts images to Unicode block art with ANSI colors.
-
-Example:
-
-```rust
-use zaz::{render_mosaic, MosaicConfig};
-
-let img = image::open("examples/resources/yellow.png")?;
-let rgb_img = img.to_rgb8();
-let (width, height) = rgb_img.dimensions();
-let data = rgb_img.as_raw();
-
-let config = MosaicConfig::with_width(60).threshold(100);
-let art = render_mosaic(data, width as usize, height as usize, &config);
-println!("{}", art);
-```
-
-The same functionality is available through the C FFI:
-
-```c
-char* mosaic = zaz_render_mosaic(data, data_len, width, height, 60, 100);
-printf("%s\n", mosaic);
-zaz_free_string(mosaic);
-```
 
 ## License
 
