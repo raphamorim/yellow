@@ -6,6 +6,13 @@ license = "MIT"
 version = "0.0.1"
 edition = "2024"
 
+include = [
+    "src/**",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
