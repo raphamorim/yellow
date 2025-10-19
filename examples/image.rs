@@ -87,8 +87,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let choice = scr.getch()?;
 
     match choice {
-        yellow::Key::Char('1') => demo_kitty(&mut scr)?,
-        yellow::Key::Char('2') => demo_sixel(&mut scr)?,
+        zaz::Key::Char('1') => demo_kitty(&mut scr)?,
+        zaz::Key::Char('2') => demo_sixel(&mut scr)?,
         _ => {}
     }
 

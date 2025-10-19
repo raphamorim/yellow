@@ -1,9 +1,9 @@
-//! A Yellow example that shows the full range of RGB colors that can be displayed in the terminal.
+//! A Zaz example that shows the full range of RGB colors that can be displayed in the terminal.
 //!
 //! Requires a terminal that supports 24-bit color (true color) and unicode.
 //!
 //! This example demonstrates:
-//! - RGB color rendering with Yellow
+//! - RGB color rendering with Zaz
 //! - Double-buffering for smooth animation
 //! - FPS calculation and display
 //! - Using half-block characters for higher resolution color display

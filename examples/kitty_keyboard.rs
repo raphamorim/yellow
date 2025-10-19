@@ -48,9 +48,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 msg.push_str(&format!(
                     " [{}]",
                     match event.event_type {
-                        yellow::KeyEventType::Press => "Press",
-                        yellow::KeyEventType::Repeat => "Repeat",
-                        yellow::KeyEventType::Release => "Release",
+                        zaz::KeyEventType::Press => "Press",
+                        zaz::KeyEventType::Repeat => "Repeat",
+                        zaz::KeyEventType::Release => "Release",
                     }
                 ));
 

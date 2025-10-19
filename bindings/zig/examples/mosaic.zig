@@ -1,5 +1,5 @@
 const std = @import("std");
-const yellow = @import("yellow");
+const zaz = @import("zaz");
 
 // Import image loader wrapper
 const c = @cImport({
@@ -14,7 +14,7 @@ pub fn main() !void {
     var height: c_int = 0;
     var channels: c_int = 0;
 
-    const img_path = "examples/resources/yellow.png";
+    const img_path = "examples/resources/zaz.png";
     const img_data = c.load_image(img_path, &width, &height, &channels);
 
     if (img_data == null) {
@@ -28,7 +28,7 @@ pub fn main() !void {
     const image_slice = img_data[0..img_size];
 
     // Render mosaic with threshold 100 and All blocks (matching Rust demo)
-    const mosaic = yellow.c.yellow_render_mosaic(
+    const mosaic = zaz.c.zaz_render_mosaic(
         image_slice.ptr,
         image_slice.len,
         @intCast(width),
@@ -36,7 +36,7 @@ pub fn main() !void {
         60,  // output width (matching Rust demo)
         100  // threshold (matching Rust demo)
     );
-    defer yellow.c.yellow_free_string(mosaic);
+    defer zaz.c.zaz_free_string(mosaic);
 
     if (mosaic == null) {
         try stdout.print("Error: Failed to render mosaic\n", .{});
