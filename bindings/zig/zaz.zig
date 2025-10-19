@@ -76,6 +76,20 @@ pub const Screen = opaque {
         return Key.fromC(c_key);
     }
 
+    /// Get a key from input with timeout (in milliseconds)
+    /// Returns null if timeout expires
+    pub fn getchTimeout(self: *Screen, timeout_ms: u64) !?Key {
+        var c_key: c.ZazKey = undefined;
+        const result = c.zaz_getch_timeout(@ptrCast(self), timeout_ms, &c_key);
+        if (result < 0) {
+            return error.GetchFailed;
+        }
+        if (result == 0) {
+            return null; // Timeout
+        }
+        return Key.fromC(c_key);
+    }
+
     /// Set foreground color (RGB)
     pub fn setFgColor(self: *Screen, r: u8, g: u8, b: u8) !void {
         const result = c.zaz_set_fg_color(@ptrCast(self), r, g, b);
@@ -184,11 +198,11 @@ pub const Key = union(enum) {
 
 /// Text attributes
 pub const Attr = enum(u32) {
-    bold = c.YELLOW_ATTR_BOLD,
-    dim = c.YELLOW_ATTR_DIM,
-    italic = c.YELLOW_ATTR_ITALIC,
-    underline = c.YELLOW_ATTR_UNDERLINE,
-    blink = c.YELLOW_ATTR_BLINK,
-    reverse = c.YELLOW_ATTR_REVERSE,
-    strikethrough = c.YELLOW_ATTR_STRIKETHROUGH,
+    bold = c.ZAZ_ATTR_BOLD,
+    dim = c.ZAZ_ATTR_DIM,
+    italic = c.ZAZ_ATTR_ITALIC,
+    underline = c.ZAZ_ATTR_UNDERLINE,
+    blink = c.ZAZ_ATTR_BLINK,
+    reverse = c.ZAZ_ATTR_REVERSE,
+    strikethrough = c.ZAZ_ATTR_STRIKETHROUGH,
 };

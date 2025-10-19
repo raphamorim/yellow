@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     scr.clear()?;
     scr.draw_box()?;
-    scr.mvprint(1, 2, "Yellow Image Protocol Demo")?;
+    scr.mvprint(1, 2, "Image Protocol Demo")?;
     scr.mvprint(3, 2, "This demo shows both Kitty and Sixel image protocols")?;
 
     // Ask which protocol to use

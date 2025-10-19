@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demonstrate ACS characters with box drawing
     scr.draw_box()?;
-    scr.mvprint(1, 2, "Yellow Advanced Features Demo")?;
+    scr.mvprint(1, 2, "Advanced Features Demo")?;
 
     // Panel demonstration
     scr.mvprint(3, 2, "Creating overlapping panels...")?;

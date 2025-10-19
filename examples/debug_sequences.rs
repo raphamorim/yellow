@@ -3,8 +3,6 @@
 use zaz::{ImageFormat, KittyImage, SixelImage};
 
 fn main() {
-    println!("=== Image Protocol Debug ===\n");
-
     // Test 1: Minimal Kitty image (2x2 red square)
     println!("1. Kitty Protocol - 2x2 red square (RGB format):");
     let kitty_data = vec![

@@ -320,6 +320,31 @@ pub extern "C" fn zaz_getch(screen: *mut ZazScreen, key_out: *mut ZazKey) -> i32
     }
 }
 
+/// Get a key from input with timeout
+/// Returns 1 if key was pressed (key_out is set), 0 if timeout, -1 on error
+#[unsafe(no_mangle)]
+pub extern "C" fn zaz_getch_timeout(
+    screen: *mut ZazScreen,
+    timeout_ms: u64,
+    key_out: *mut ZazKey,
+) -> i32 {
+    if screen.is_null() || key_out.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        let screen = &mut *(screen as *mut Screen);
+        match screen.getch_timeout(timeout_ms) {
+            Ok(Some(key)) => {
+                *key_out = key.into();
+                1 // Key was pressed
+            }
+            Ok(None) => 0, // Timeout
+            Err(_) => -1,  // Error
+        }
+    }
+}
+
 /// Set foreground color
 #[unsafe(no_mangle)]
 pub extern "C" fn zaz_set_fg_color(screen: *mut ZazScreen, r: u8, g: u8, b: u8) -> i32 {

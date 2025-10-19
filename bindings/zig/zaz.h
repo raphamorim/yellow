@@ -117,6 +117,12 @@ int32_t zaz_mvprint(ZazScreen* screen, uint16_t y, uint16_t x, const char* text)
 int32_t zaz_getch(ZazScreen* screen, ZazKey* key_out);
 
 /**
+ * Get a key from input with timeout
+ * Returns 1 if key was pressed (key_out is set), 0 if timeout, -1 on error
+ */
+int32_t zaz_getch_timeout(ZazScreen* screen, uint64_t timeout_ms, ZazKey* key_out);
+
+/**
  * Set foreground color (RGB)
  * Returns 0 on success, -1 on error
  */

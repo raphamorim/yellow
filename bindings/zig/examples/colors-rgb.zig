@@ -42,7 +42,7 @@ const ColorsWidget = struct {
 
     fn init(allocator: std.mem.Allocator) ColorsWidget {
         return .{
-            .colors = std.ArrayList(std.ArrayList(Rgb)).init(allocator),
+            .colors = .{},
             .frame_count = 0,
             .width = 0,
             .height = 0,
@@ -51,10 +51,10 @@ const ColorsWidget = struct {
     }
 
     fn deinit(self: *ColorsWidget) void {
-        for (self.colors.items) |row| {
-            row.deinit();
+        for (self.colors.items) |*row| {
+            row.deinit(self.allocator);
         }
-        self.colors.deinit();
+        self.colors.deinit(self.allocator);
     }
 
     fn hsvToRgb(h: f32, s: f32, v: f32) Rgb {
@@ -97,8 +97,8 @@ const ColorsWidget = struct {
         }
 
         // Clear existing colors
-        for (self.colors.items) |row| {
-            row.deinit();
+        for (self.colors.items) |*row| {
+            row.deinit(self.allocator);
         }
         self.colors.clearRetainingCapacity();
 
@@ -108,8 +108,8 @@ const ColorsWidget = struct {
         // Generate new colors
         var y: usize = 0;
         while (y < h) : (y += 1) {
-            var row = std.ArrayList(Rgb).init(self.allocator);
-            try row.ensureTotalCapacity(w);
+            var row: std.ArrayList(Rgb) = .{};
+            try row.ensureTotalCapacity(self.allocator, w);
 
             var x: usize = 0;
             while (x < w) : (x += 1) {
@@ -118,10 +118,10 @@ const ColorsWidget = struct {
                 const saturation: f32 = 1.0;
 
                 const color = hsvToRgb(hue, saturation, value);
-                try row.append(color);
+                try row.append(self.allocator, color);
             }
 
-            try self.colors.append(row);
+            try self.colors.append(self.allocator, row);
         }
     }
 
@@ -173,10 +173,11 @@ pub fn main() !void {
         try screen.clear();
 
         // Render top bar with title and FPS
-        const separator = "─";
-        var sep_buf: [256]u8 = undefined;
-        var sep_line = try std.fmt.bufPrint(&sep_buf, "{s}" ** cols, .{separator} ** cols);
-        try screen.mvprint(1, 0, sep_line[0..cols]);
+        // Draw separator line
+        var sep_x: u16 = 0;
+        while (sep_x < cols) : (sep_x += 1) {
+            try screen.mvprint(1, sep_x, "─");
+        }
 
         // Render title (centered)
         const title = "colors_rgb example. Press any key to quit";

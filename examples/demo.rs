@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     scr.init_pair(1, Color::Yellow, Color::Blue)?;
     scr.color_pair(1)?;
     scr.attron(Attr::BOLD)?;
-    scr.mvprint(2, 10, "Yellow Terminal Library Demo")?;
+    scr.mvprint(2, 10, "Library Demo")?;
     scr.attroff(Attr::BOLD)?;
 
     // Reset colors

@@ -7,6 +7,8 @@ pub fn build(b: *std.Build) void {
     // Create zaz module
     const zaz_mod = b.createModule(.{
         .root_source_file = b.path("zaz.zig"),
+        .target = target,
+        .optimize = optimize,
         .link_libc = true,
     });
     zaz_mod.addIncludePath(b.path("."));
@@ -14,14 +16,14 @@ pub fn build(b: *std.Build) void {
     // Basic example module
     const basic_mod = b.createModule(.{
         .root_source_file = b.path("examples/basic.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     basic_mod.addImport("zaz", zaz_mod);
 
     const basic_exe = b.addExecutable(.{
         .name = "basic",
         .root_module = basic_mod,
-        .target = target,
-        .optimize = optimize,
     });
     basic_exe.addIncludePath(.{ .cwd_relative = "." });
     basic_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
@@ -32,14 +34,14 @@ pub fn build(b: *std.Build) void {
     // Colors RGB example module
     const colors_mod = b.createModule(.{
         .root_source_file = b.path("examples/colors-rgb.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     colors_mod.addImport("zaz", zaz_mod);
 
     const colors_exe = b.addExecutable(.{
         .name = "colors-rgb",
         .root_module = colors_mod,
-        .target = target,
-        .optimize = optimize,
     });
     colors_exe.addIncludePath(.{ .cwd_relative = "." });
     colors_exe.addLibraryPath(.{ .cwd_relative = "../../target/release" });
